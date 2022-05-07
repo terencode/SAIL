@@ -15,7 +15,13 @@ let getLLVMType (t : sailtype) (llc: llcontext) (llm: llmodule) : lltype =
   | String -> i8_type llc |> pointer_type
   | ArrayType t -> aux t (* we just return the type of the elements *)
   | CompoundType (_, [t])-> aux t
-  | CompoundType _-> failwith "compound type unimplemented"
+  | CompoundType (name, []) ->
+    begin
+      match type_by_name llm name with
+      | Some t -> t
+      | None -> "type " ^ name ^ " doesn't exist!" |> failwith
+    end
+  | CompoundType _ -> failwith "unimplemented12"
   | Box _ -> failwith "boxing unimplemented" 
   | RefType (t,_) -> aux t |> pointer_type
   | GenericType _ -> failwith "generic types unimplemented"

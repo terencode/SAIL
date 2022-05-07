@@ -9,10 +9,14 @@ let error_handler err = "LLVM ERROR: " ^ err |> print_endline
 let fileToIR (a : Ast.statement Common.sailModule) : llmodule  = 
   let llc = global_context () in
   let llm = create_module llc (a.name ^ ".sl") in
+
+  (* fixme : this forces an order of declaration *)
   let env = SailEnv.empty () in
-  (* fixme : this forces an order of declaration ... *)
-  List.iter (fun s -> parse_method s llc llm env) a.methods;
-  List.iter (fun s -> parse_process s llc llm env) a.processes;
+  let env = List.fold_left (fun env s -> parse_enums s llc llm env) env a.enums in
+  let env = List.fold_left (fun env s -> parse_structs s llc llm env) env a.structs in
+  let env = List.fold_left (fun env s -> parse_method s llc llm env) env a.methods in
+  let _   = List.fold_left (fun env s -> parse_process s llc llm env) env a.processes in
+
   match Llvm_analysis.verify_module llm with
   | None -> llm
   | Some reason -> print_endline reason; llm
