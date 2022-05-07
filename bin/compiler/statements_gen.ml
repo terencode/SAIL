@@ -37,7 +37,7 @@ and branch_returns (br:llvalue) : bool =
 
 
   
-let statementToIR (m:llvalue) (x: Ast.statement) (llvm:llvm_args) (env :SailEnv.t) : unit =
+let statementToIR (m:llvalue) (x: Ast.statement) (llvm:llvm_args) (env :SailEnv.t) : SailEnv.t =
   let rec aux x env : SailEnv.t = 
     match x with 
   | Ast.DeclVar (mut, name, t, exp) -> declare_var m mut name t exp llvm env
@@ -142,4 +142,4 @@ let statementToIR (m:llvalue) (x: Ast.statement) (llvm:llvm_args) (env :SailEnv.
     SailEnv.pop_frame new_env
 
 in 
-aux x env |> ignore
+aux x env
