@@ -115,9 +115,19 @@ and eval_r (env:SailEnv.t) (llvm:llvm_args) (x:Ast.expression) : llvalue =
     | Some s -> s
     | None -> "unknown structure : " ^ name |> failwith 
     in
-    let values = List.map (fun n -> print_endline "D"; let x = eval_r env llvm n in print_endline "F"; dump_value x; print_newline (); x) fieldlist |> Array.of_list in
+    let values = List.map (
+      fun e -> 
+        print_endline "DEBUT";
+        let x = eval_r env llvm e in 
+        print_endline "FIN"; dump_value x; print_newline (); 
+        x
+    ) fieldlist |> Array.of_list in
+
     const_named_struct strct values
-  | EnumAlloc _   -> failwith "enum alloc is not a rvalue"
+
+  | EnumAlloc (name, [])   -> build_global_string name ".str" llvm.b  
+  | EnumAlloc _   -> failwith "unimplemented14"
+
   | MethodCall (name, args) -> let args' = List.map (eval_r env llvm) args |> Array.of_list in
     begin
     match lookup_function name llvm.m with 

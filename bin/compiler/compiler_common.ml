@@ -6,7 +6,12 @@ type llvm_args = { c:llcontext; b:llbuilder;m:llmodule; }
 
 type statement_return = SailEnv.t * ( SailEnv.value option )
 
-let getLLVMType (t : sailtype) (llc: llcontext) (llm: llmodule) : lltype = 
+
+
+let getLLVMType (t : sailtype) (llc: llcontext) (llm: llmodule) (env:SailEnv.t) : lltype = 
+  let get_custom_type name = 
+    Some (i1_type llc)
+  in 
   let rec aux = function
   | Bool -> i1_type llc
   | Int -> i32_type llc 
@@ -17,9 +22,14 @@ let getLLVMType (t : sailtype) (llc: llcontext) (llm: llmodule) : lltype =
   | CompoundType (_, [t])-> aux t
   | CompoundType (name, []) ->
     begin
-      match type_by_name llm name with
+      match get_custom_type name with
       | Some t -> t
-      | None -> "type " ^ name ^ " doesn't exist!" |> failwith
+      | None -> 
+        begin
+          match type_by_name llm name with
+          | Some t -> t
+          | None -> "type " ^ name ^ " doesn't exist!" |> failwith
+        end
     end
   | CompoundType _ -> failwith "unimplemented12"
   | Box _ -> failwith "boxing unimplemented" 

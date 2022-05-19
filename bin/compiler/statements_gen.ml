@@ -7,7 +7,7 @@ open Llvm
 
 let declare_var (methd:llvalue) (mut:bool) (name:string) (ty:Common.sailtype) (exp:Ast.expression option) (llvm:llvm_args) (env:SailEnv.t) : SailEnv.t =
   let _ = mut in (* todo manage mutable types *)
-  let var_type = getLLVMType ty llvm.c llvm.m  in
+  let var_type = getLLVMType ty llvm.c llvm.m env in
   let entry_b = entry_block methd |> instr_begin |> builder_at llvm.c in
   let v =  
     match (ty,exp) with

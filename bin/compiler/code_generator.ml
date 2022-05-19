@@ -42,10 +42,10 @@ let processToIR (method_proto : llvalue) (p_body : Ast.statement) (llc:llcontext
     if (Option.is_none bt) then
           build_ret_void builder |> ignore
 
-let methodArgs (args: (string * Common.sailtype) list ) (llc:llcontext) (llm:llmodule) : (llbuilder->llvalue) array = 
+let methodArgs (args: (string * Common.sailtype) list ) (llc:llcontext) (llm:llmodule) (env:SailEnv.t) : (llbuilder->llvalue) array = 
     let llvalue_list = List.map (
       fun (name, t) -> 
-        let  ty = getLLVMType t llc llm in
+        let  ty = getLLVMType t llc llm env in
         build_alloca ty name
     ) args in
     Array.of_list llvalue_list
@@ -53,11 +53,11 @@ let methodArgs (args: (string * Common.sailtype) list ) (llc:llcontext) (llm:llm
 
 let parse_method (s : Ast.statement Common.method_defn) (llc:llcontext) (llm:llmodule) (env:SailEnv.t) : SailEnv.t =
   let method_rt = match s.m_rtype with
-  | Some t -> getLLVMType t llc llm
+  | Some t -> getLLVMType t llc llm env
   | None -> void_type llc
   in
   let method_t = 
-    let args_type = List.map (fun (_,arg) -> getLLVMType arg llc llm) s.m_params |> Array.of_list in
+    let args_type = List.map (fun (_,arg) -> getLLVMType arg llc llm env) s.m_params |> Array.of_list in
     function_type method_rt args_type 
   in
   let method_proto = match lookup_function s.m_name llm with
@@ -67,7 +67,7 @@ let parse_method (s : Ast.statement Common.method_defn) (llc:llcontext) (llm:llm
         "redefinition of method " ^  s.m_name |> failwith
       else f
   in 
-  let args = methodArgs s.m_params llc llm in
+  let args = methodArgs s.m_params llc llm env in
   let new_env = methodToIR method_proto args s.m_body llc llm env in
   if not (Llvm_analysis.verify_function method_proto) then
     begin
@@ -98,15 +98,17 @@ let parse_process (s: Ast.statement Common.process_defn) (llc:llcontext) (llm:ll
 
 
 let parse_enums (e: Common.enum_defn) (llc:llcontext) (llm:llmodule) (env:SailEnv.t) : SailEnv.t = 
-  (* todo *)
-  (e,llc,llm,env) |> ignore;
+  let names,ty = List.split e.e_injections in
+  let env = SailEnv.declare_struct_fields env e.e_name names in
+  SailEnv.print_env env;
   env
+
   
   
 let parse_structs (s: Common.struct_defn) (llc:llcontext) (llm:llmodule) (env:SailEnv.t) : SailEnv.t  = 
   (* todo : manage s.s_generics *)
   let f_names,f_types = List.split s.s_fields in
-  let elts = List.map (fun t -> getLLVMType t llc llm ) f_types |> Array.of_list in
+  let elts = List.map (fun t -> getLLVMType t llc llm env) f_types |> Array.of_list in
   let struct_type =  s.s_name  |> named_struct_type llc in
   struct_set_body struct_type elts false;
   SailEnv.declare_struct_fields env s.s_name f_names
