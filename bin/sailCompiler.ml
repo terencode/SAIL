@@ -11,8 +11,9 @@ let fileToIR (a : Ast.statement Common.sailModule) : llmodule  =
   let llm = create_module llc (a.name ^ ".sl") in
 
   (* fixme : this forces an order of declaration *)
-  let env = SailEnv.empty () in
-  let env = List.fold_left (fun env s -> parse_enums s llc llm env) env a.enums in
+  (* fixme : do not pass full env, only global defs *)
+  let env = SailEnv.empty in
+  let globals = List.fold_left (fun env s -> parse_enums s llc llm env) env a.enums in
   let env = List.fold_left (fun env s -> parse_structs s llc llm env) env a.structs in
   let env = List.fold_left (fun env s -> parse_method s llc llm env) env a.methods in
   let _   = List.fold_left (fun env s -> parse_process s llc llm env) env a.processes in

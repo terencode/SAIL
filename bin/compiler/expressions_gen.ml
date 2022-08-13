@@ -51,26 +51,28 @@ let binary (op:binOp) (l1:llvalue) (l2:llvalue) (llvm:llvm_args) : llvalue =
     let open MonadOption in
     match l >>| List.assoc op with
     | Some oper -> oper l1 l2 "" llvm.b
-    | None ->  Printf.sprintf "bad binary operand type : '%s'. Only doubles and ints are supported" (string_of_lltype ty) |> failwith
+    | None ->  dump_module llvm.m;  Printf.sprintf "bad binary operand type : '%s'. Only doubles and ints are supported" (string_of_lltype ty) |> failwith
 
 
 let rec eval_l (env:SailEnv.t) (llvm:llvm_args) (x: Ast.expression) : llvalue = 
   let open Ast in
   match x with
-  | Variable x -> Printf.sprintf "variable %s" x |> print_string; print_newline (); SailEnv.get_var env x
+  | Variable x -> SailEnv.get_var env x |> SailEnv.get_value
   | Deref x-> eval_r env llvm x
   | ArrayRead (array_exp, index_exp) -> 
-    let array = eval_l env llvm array_exp in
+    let array = build_load (eval_l env llvm array_exp) "" llvm.b in
     let index = eval_r env llvm index_exp in
-    build_gep array [|(const_int (i64_type llvm.c) 0); index|] "" llvm.b
+    build_gep array [| index |] "" llvm.b
+    
   | StructRead (struct_exp,field) -> 
     let st = eval_l env llvm struct_exp in
-    let st_type_name = dump_value st; match struct_name (type_of st |> subtypes).(0) with
+    let st_type_name = match struct_name (type_of st |> subtypes).(0) with
         | None -> failwith "problem with structure type"
         | Some name -> name
     in
-    let idx = SailEnv.get_struct_field env st_type_name field in
-    build_struct_gep st idx "" llvm.b
+    failwith "nope"
+    (* let idx = SailEnv.get_struct_field env st_type_name field in
+    build_struct_gep st idx "" llvm.b *)
   | EnumAlloc (_, _) -> failwith "enum unimplemented"
   | StructAlloc (_, _) -> failwith "struct allocation is not a lvalue"
   | ArrayStatic _ -> failwith "array alloc is not a lvalue"
@@ -106,7 +108,7 @@ and eval_r (env:SailEnv.t) (llvm:llvm_args) (x:Ast.expression) : llvalue =
       failwith "Error : mixed type array !";
   
     let array = const_array array_type array_values in
-    build_load (define_global "const_array" array llvm.m) "" llvm.b
+    define_global "const_array" array llvm.m
     end
   | StructAlloc (name,fieldmap) -> print_endline name;
     let open FieldMap in
@@ -128,6 +130,9 @@ and eval_r (env:SailEnv.t) (llvm:llvm_args) (x:Ast.expression) : llvalue =
   | EnumAlloc (name, [])   -> build_global_string name ".str" llvm.b  
   | EnumAlloc _   -> failwith "unimplemented14"
 
+
+  | MethodCall ("len", [Variable v]) -> 
+    SailEnv.get_var env v |> SailEnv.array_length |> const_int (i32_type llvm.c) 
   | MethodCall (name, args) -> let args' = List.map (eval_r env llvm) args |> Array.of_list in
     begin
     match lookup_function name llvm.m with 

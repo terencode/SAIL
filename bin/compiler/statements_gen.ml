@@ -12,13 +12,18 @@ let declare_var (methd:llvalue) (mut:bool) (name:string) (ty:Common.sailtype) (e
   let v =  
     match (ty,exp) with
     | (ArrayType _, Some e) -> 
-      let array = eval_r env llvm e in
-      let array_alloc = build_alloca (type_of array) name entry_b in 
-      build_store array array_alloc llvm.b |> ignore ; array_alloc
-    | (ArrayType _,None) -> failwith "Error : array must have an initializer"   
+      let array = eval_r env llvm e  in
+      let array_alloc = build_alloca var_type name entry_b in 
+      let _ = build_store (const_bitcast array var_type) array_alloc llvm.b in
+      type_of (build_load array "" llvm.b) |> array_length |> SailEnv.make_array_var array_alloc 
+
+    | (ArrayType _,_) -> failwith "Error : array must have a correct initializer"  
+
     | (_, Some e) -> let x = build_alloca var_type name entry_b in 
-        build_store (eval_r env llvm e) x llvm.b |> ignore; x  
-    | _ -> build_alloca var_type name entry_b
+        build_store (eval_r env llvm e) x llvm.b |> ignore; 
+        SailEnv.make_ground_var x
+
+    | _ -> build_alloca var_type name entry_b |> SailEnv.make_ground_var
   in
   SailEnv.declare_var env name v
 
@@ -26,7 +31,7 @@ let declare_var (methd:llvalue) (mut:bool) (name:string) (ty:Common.sailtype) (e
 
 let rec block_returns (bb:llbasicblock) : bool = 
   match block_terminator bb with
-  | Some s when instr_opcode s = Opcode.Ret ->  true
+  | Some s when instr_opcode s = Opcode.Ret -> true
   | Some s when instr_opcode s = Opcode.Br ->  branch_returns s
   | _ -> false 
 and branch_returns (br:llvalue) : bool =
@@ -45,6 +50,7 @@ let statementToIR (m:llvalue) (x: Ast.statement) (llvm:llvm_args) (env :SailEnv.
   | DeclSignal _ -> failwith "unimplemented2"
   | Skip -> env
   | Assign (e1,e2) -> 
+    (* todo change array length *)
     let lvalue = eval_l env llvm e1
     and rvalue = eval_r env llvm e2 in
     build_store rvalue lvalue llvm.b |> ignore;
@@ -137,6 +143,7 @@ let statementToIR (m:llvalue) (x: Ast.statement) (llvm:llvm_args) (env :SailEnv.
   | When (_, _) ->  failwith "when unimplemented"
   | Watching (_, _) -> failwith "watching unimplemented"
   | Block s -> 
+    Logs.debug (fun m -> m "new block");
     (* we create a new frame for inside the block and unstack it on return *)
     let new_env = aux s (SailEnv.new_frame env) in
     SailEnv.pop_frame new_env

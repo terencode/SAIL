@@ -4,7 +4,7 @@ open Sail_env
 
 type llvm_args = { c:llcontext; b:llbuilder;m:llmodule; }
 
-type statement_return = SailEnv.t * ( SailEnv.value option )
+type statement_return = SailEnv.t * ( SailEnv.variable option )
 
 
 
@@ -18,7 +18,7 @@ let getLLVMType (t : sailtype) (llc: llcontext) (llm: llmodule) (env:SailEnv.t) 
   | Float -> double_type llc
   | Char -> i8_type llc
   | String -> i8_type llc |> pointer_type
-  | ArrayType t -> aux t (* we just return the type of the elements *)
+  | ArrayType t -> aux t |> pointer_type
   | CompoundType (_, [t])-> aux t
   | CompoundType (name, []) ->
     begin
