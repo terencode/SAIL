@@ -50,7 +50,7 @@ let statementToIR (m:llvalue) (x: Ast.statement) (llvm:llvm_args) (env :SailEnv.
     build_store rvalue lvalue llvm.b |> ignore;
     env
 
-  | Seq (s1,s2)-> SailEnv.print_env env;  let new_env = aux s1 env in  SailEnv.print_env new_env; aux s2 new_env
+  | Seq (s1,s2)-> let new_env = aux s1 env in aux s2 new_env
 
   | Par (_,_) ->  failwith "unimplemented6"
 

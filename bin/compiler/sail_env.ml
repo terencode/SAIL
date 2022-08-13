@@ -1,11 +1,13 @@
 open Llvm
 
-module type Env = sig
+(* module type Env = sig
   type t
   type value
   val empty : unit -> t
   val get_var : t -> string -> value
   val declare_var : t -> string -> value -> t
+
+  val declare_global_var : t -> string -> value -> t
 
   val declare_struct_fields : t -> string -> string list -> t
 
@@ -24,9 +26,9 @@ sig
 
   val new_frame : t -> t
   val current_frame : t -> frame * t
-end
+end *)
 
-module SailEnv : (StackEnv with type value = llvalue) = 
+module SailEnv (* : (StackEnv with type value = llvalue) *) = 
 struct
   module M = Map.Make(String)
 
@@ -36,9 +38,9 @@ struct
 
   type frame = value_or_fields M.t
 
-  type t = frame List.t
+  type t = { stack:frame List.t; global: frame }
 
-  let empty () = let c = M.empty in [c]
+  let empty () = let c = M.empty in { stack=[c]; global=c }
 
   let push_frame env s = 
     s :: env
@@ -69,22 +71,32 @@ struct
     in try
     Logs.debug (fun _ -> "env : \n{\n" ^ aux env ^ "}" |> print_endline)
     with _ -> ()
+
+
   let get_var env name = 
     let rec aux env = 
       let current,env = current_frame env in
       match M.find_opt name current with 
       | Some Value v -> v
-      | None  when env = [] ->  Printf.sprintf "variable %s doesn't exist !" name |> failwith
+      | None when env = [] ->  Printf.sprintf "variable %s doesn't exist !" name |> failwith
       | _ -> aux env
       in aux env
 
+      
   let declare_var env name value =
-    let current,env = current_frame env in
+    let current,stack = current_frame env.stack in
     match M.find_opt name current with 
     | Some _ -> Printf.sprintf "variable %s already exists in the current frame !" name |> failwith
     | None -> 
       let upd_frame = M.add name (Value value) current in
-      push_frame env upd_frame
+      let stack = push_frame stack upd_frame in
+      {env with stack}
+
+
+  let declare_global_var env name value =
+    match M.find_opt name env.global with 
+    | Some _ -> Printf.sprintf "global variable %s already exists in the current frame !" name |> failwith
+    | None -> let global = M.add name (Value value) env.global in {env with global}
 
 
     let declare_struct_fields env s_name fields =

@@ -12,10 +12,10 @@ let fileToIR (a : Ast.statement Common.sailModule) : llmodule  =
 
   (* fixme : this forces an order of declaration *)
   let env = SailEnv.empty () in
-  let env = List.fold_left (fun env s -> parse_enums s llc llm env) env a.enums in
-  let env = List.fold_left (fun env s -> parse_structs s llc llm env) env a.structs in
-  let env = List.fold_left (fun env s -> parse_method s llc llm env) env a.methods in
-  let _   = List.fold_left (fun env s -> parse_process s llc llm env) env a.processes in
+  List.fold_left (fun env s -> parse_enums s llc llm env) env a.enums |> SailEnv.print_env;
+  List.fold_left (fun env s -> parse_structs s llc llm env) env a.structs |> SailEnv.print_env;
+  List.fold_left (fun env s -> parse_method s llc llm env) env a.methods |> SailEnv.print_env;
+  List.fold_left (fun env s -> parse_process s llc llm env) env a.processes |> SailEnv.print_env;
 
   match Llvm_analysis.verify_module llm with
   | None -> llm
