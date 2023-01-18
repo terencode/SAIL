@@ -166,7 +166,7 @@ let sailor (files: string list) (intermediate:bool) (jit:bool) (noopt:bool) (dum
           if jit then execute llm else dispose_module llm;
 
           aux r
-        | Error e, errlist -> Error.print_errors fcontent @@ e::errlist; `Error(false, "compilation aborted")
+        | Error e, errlist -> Error.print_errors fcontent @@ {errlist with errors=e::errlist.errors}; `Error(false, "compilation aborted")
         end
             end
   | [] -> `Ok ()

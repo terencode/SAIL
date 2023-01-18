@@ -28,7 +28,7 @@ let fastParse filename : (string * AstParser.statement SailModule.t, string) Res
       let lexer_prefix = "Lexer - " in
       (* removes lexer prefix in case of a lexing error *)
       let msg = String.(if starts_with ~prefix:lexer_prefix msg then sub msg (length lexer_prefix) (length msg - length lexer_prefix) else msg) in
-      Error.print_errors text @@ [Error.make loc msg];
+      Error.print_errors text @@ {errors=[Error.make loc msg]; warnings=[]};
       exit 1
 
   | exception Parser.Error ->

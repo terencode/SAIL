@@ -1,6 +1,7 @@
 open Lexing
 open Monad
 
+
 let show_context text (p1,p2) =
   let open MenhirLib.ErrorReports in
   let p1 = { p1 with pos_cnum=p1.pos_bol} 
@@ -19,8 +20,10 @@ let show_context text (p1,p2) =
     hint : string option;
     label : string option;
   } 
-  type errors = error list
-  type 'a result = ('a, errors) Result.t
+
+  type error_storage = {errors:error list; warnings: error list}
+
+  type 'a result = ('a, error_storage) Result.t
 
   let make ?(why=None) ?(hint="") ?(label="") where what : error = 
     let option_of_string = function "" -> None | s -> Some s in 
@@ -28,8 +31,7 @@ let show_context text (p1,p2) =
     and hint = option_of_string hint in
    {where;what;why;label;hint}
   
-   let print_errors (file:string) (errs:errors) : unit =  
-    if errs <> [] then
+   let print_errors (file:string) (errs:error_storage) : unit =  
     let s fmt = List.iter (
       fun {where;what;hint;_} ->
         if where = (dummy_pos,dummy_pos) then
@@ -42,8 +44,8 @@ let show_context text (p1,p2) =
           Fmt.pf fmt "@[<v>%s@ %s@ %s%s %s@,@]@ @ " location indication start ending what;
           Format.pp_print_option  (fun fmt -> Fmt.pf fmt "@[<v>Hint : %s @ @]@ ") fmt hint
       )
-     errs in
-     Logs.err (fun m -> m "@[<v 5>found %i error(s) :@." (List.length errs) );
+     (errs.errors@errs.warnings) in
+     Logs.err (fun m -> m "@[<v 5>found %i error(s) :@." (List.length errs.errors) );
      s Fmt.stderr
 
 
@@ -69,21 +71,21 @@ module type Logger = sig
   include MonadTransformer
   val catch : 'a t -> (error -> 'a t) -> 'a t
   val throw : error -> 'a t
-  val log : error -> unit t
+  val log : ?benign:bool ->  error -> unit t
   val recover : 'a -> 'a t -> 'a t
   val fail :  'a t -> 'a t
-  val log_if : bool -> error -> unit t
+  val log_if :  ?benign:bool ->  bool -> error -> unit t
   val throw_if : bool -> error -> unit t
 
 end
 
- module MakeTransformer (M : Monad) : Logger with type 'a t = (('a,error) Result.t * error list) M.t and type 'a old_t = 'a M.t = struct 
+ module MakeTransformer (M : Monad) : Logger with type 'a t = (('a,error) Result.t * error_storage) M.t and type 'a old_t = 'a M.t = struct 
   open MonadSyntax(M)
 
   type 'a old_t = 'a M.t
-  type 'a t = (('a, error) Result.t * error list) old_t
+  type 'a t = (('a, error) Result.t * error_storage) old_t
 
-  let pure (x:'a) : 'a t = (Ok x,[]) |> M.pure
+  let pure (x:'a) : 'a t = (Ok x,{errors=[];warnings=[]}) |> M.pure
 
   let fmap (f: 'a -> 'b) (x:'a t) : 'b t =
     let+ v,l = x in
@@ -94,45 +96,48 @@ end
   let apply (f:('a -> 'b) t) (x: 'a t) : 'b t = 
   let+ f,l1 = f and* x,l2 = x in
   match f,x with
-  | Error err1,Error err2 -> Error err1, err2 :: l1 @ l2 
-  | Error err1,_ -> Error err1, l1@l2
-  | Ok f, Ok x -> Ok (f x),l1@l2
-  | Ok _, Error err ->  Error err,l1@l2
+  | Error err1,Error err2 -> Error err1, {errors=err2::l1.errors@l2.errors; warnings = l1.warnings@l2.warnings}
+  | Error err1,_ -> Error err1, {errors=l1.errors@l2.errors; warnings = l1.warnings@l2.warnings}
+  | Ok f, Ok x -> Ok (f x),{errors=l1.errors@l2.errors; warnings = l1.warnings@l2.warnings}
+  | Ok _, Error err ->  Error err,{errors=l1.errors@l2.errors; warnings = l1.warnings@l2.warnings}
 
   let bind (x:'a t) (f : 'a -> 'b t) : 'b t = 
   let* v,l1 = x in 
   match v with
   | Error err -> (Error err,l1) |> M.pure
-  | Ok x -> let+ v,l2 = f x in v,l1@l2
+  | Ok x -> let+ v,l2 = f x in v,{errors=l1.errors@l2.errors; warnings = l1.warnings@l2.warnings}
 
-  let lift (x:'a M.t) : 'a t = let+ x in Ok x,[]
+  let lift (x:'a M.t) : 'a t = let+ x in Ok x,{errors=[]; warnings=[]}
 
-  let throw (e:error) : 'a t = (Error e,[]) |> M.pure
+  let throw (e:error) : 'a t = (Error e,{errors=[]; warnings=[]}) |> M.pure
 
   let catch (x : 'a t) (f:error -> 'a t) : 'a t = 
   let* v,l = x in 
   match v with
-  | Error err -> let+ x,l2 = f err in x,l@l2
+  | Error err -> let+ x,l2 = f err in x,{errors=l.errors@l2.errors; warnings = l.warnings@l2.warnings}
   | Ok x ->  (Ok x,l) |> M.pure 
 
 
-  let log (msg:error) : unit t = (Ok (),[msg]) |> M.pure
+  let log ?(benign=false) (msg:error)  : unit t = 
+    if benign then 
+      (Ok (),{errors=[]; warnings=[msg]}) |> M.pure 
+    else (Ok (),{errors=[msg]; warnings=[]}) |> M.pure 
 
   let recover (default : 'a)  (x:'a t) : 'a t =
     let+ v,l = x in
       match v with
     | Ok x -> Ok x,l
-    | Error err -> Ok default,err::l
+    | Error err -> Ok default,{l with errors=err::l.errors}
 
 
   let fail (x:'a t) : 'a t = 
     let+ v,l = x in
     match v,l with
     | Error err,_ -> Error err,l
-    | Ok x,[] -> Ok x,[]
-    | Ok _,h::t -> Error h,t
+    | Ok x,{errors=[];_} -> Ok x,l
+    | Ok _,{errors=h::t;_} -> Error h,{l with errors=t}
 
-  let log_if b e = if b then log e else pure ()
+  let log_if ?(benign=false) b e  = if b then log e ~benign else pure ()
   let throw_if b e = if b then throw e else pure ()
 
 

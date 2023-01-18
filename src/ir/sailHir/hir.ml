@@ -123,7 +123,10 @@ struct
 
     | Invoke ((l_id,id) as lid, el) ->
         let* m = ECS.get_method id and* env = ECS.get in
-        let* () = ECS.log_if (Option.is_none m) (let hint = get_hint id env in (Error.make l_id "unknown method" ~hint))
+        let* () = 
+        match m with
+        | None -> ECS.log (let hint = get_hint id env in (Error.make l_id "unknown method" ~hint))
+        | Some (_,m) -> ECS.log_if ~benign:true (Option.is_some m.ret) (Error.make l_id @@ Printf.sprintf "result of non-void function %s is discarded" id)
         in
         let+ el,s = listMapM lower_expression el in
         buildSeqStmt s (Invoke(None, lid,el))

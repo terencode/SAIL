@@ -17,7 +17,7 @@ module Make(MonoidSeq : Monoid.Monoid) = struct
     let find_var id = bind get (fun e -> HIREnv.get_var e id |> pure)
     let throw e = E.throw e |> EC.lift |> lift 
     let log e = E.log e |> EC.lift |> lift 
-    let log_if b e = E.log_if b e |> EC.lift |> lift 
+    let log_if ?(benign=false) b e = E.log_if b e ~benign |> EC.lift |> lift 
     let throw_if b e = E.throw_if b e |> EC.lift |> lift 
 
     let get_method id = bind get (fun e -> HIREnv.get_method e id |> pure) 
