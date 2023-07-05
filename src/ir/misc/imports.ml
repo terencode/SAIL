@@ -2,35 +2,34 @@ open Common
 open TypesCommon
 open IrMir
 
-module E = Common.Error
-open Monad.MonadSyntax(E.Logger)
-open Monad.MonadFunctions(E.Logger)
+module E = Common.Error.Logger
+module Env = SailModule.DeclEnv
+open Monad.UseMonad(E)
 
+let read_imports (imports : ImportSet.t) : (string * Mir.Pass.out_body SailModule.t) list  = 
+List.map (fun i ->  
+  Logs.debug (fun m -> m "reading mir for import '%s' (%s)" i.mname i.dir); 
+  i.dir,In_channel.with_open_bin (i.dir ^ i.mname ^ Constants.mir_file_ext) @@ fun c -> (Marshal.from_channel c : Mir.Pass.out_body SailModule.t)
+) (ImportSet.elements imports)
 
 module Pass = Pass.Make( struct
-  let name = "Resolve imports"
-  type in_body = Mir.Pass.out_body
+  let name = "Get imported modules imports"
+  type in_body = IrThir.ThirUtils.statement SailModule.methods_processes
   type out_body  = in_body
 
-  let read_imports (imports : ImportSet.t) : (string * in_body SailModule.t) list  = 
-    List.map (fun i ->  
-      Logs.debug (fun m -> m "reading mir for import '%s' (%s)" i.mname i.dir); 
-      i.dir,In_channel.with_open_bin (i.dir ^ i.mname ^ Constants.mir_file_ext) Marshal.from_channel
-    ) (ImportSet.elements imports)
-
-  let set_fcall_source (m:in_body SailModule.t) : in_body SailModule.t E.Logger.t = 
+  let set_fcall_source (m:in_body SailModule.t) : out_body SailModule.t E.t = 
     let imports = read_imports m.imports in
 
     let+ libs,methods = 
       ListM.fold_left_map (fun libs f -> 
       match f.m_body with
-      | Right b -> 
-        (libs,{m_proto={f.m_proto with name = "_" ^ m.md.name ^"_" ^ f.m_proto.name}; m_body=Either.Right b}) |> E.Logger.pure
+      | Right _ -> 
+        (libs,f) |> E.pure
       | Left (realname,lib) -> (* extern method, give it its realname for codegen *)
         let m_proto = {f.m_proto with name=realname} in
         let libs = FieldSet.add_seq (List.to_seq lib) libs in
         return (libs,{f with m_proto}) (* add lib required by ffi *)
-      ) FieldSet.empty m.methods 
+      ) FieldSet.empty m.body.methods 
     in
     (* the imports of my imports are my imports and same goes for the libs *)
     let libs,imports =  List.fold_left (
@@ -46,10 +45,27 @@ module Pass = Pass.Make( struct
 
       let imports = ImportSet.(diff m.imports imports  |> union imports ) in 
     
-    {m with methods ; imports; md={m.md with libs}}
+    {m with body = SailModule.{methods ; processes=m.body.processes}; imports; md={m.md with libs}}
 
-  let transform (smdl : in_body SailModule.t)  : out_body SailModule.t E.Logger.t =
+
+
+  let add_imports (smdl : out_body SailModule.t) : out_body SailModule.t = 
+    let sorted_imports = (smdl.imports |> ImportSet.diff smdl.imports |> ImportSet.elements |> List.sort (fun i1 i2 -> Int.compare i1.proc_order i2.proc_order)) in 
+    let declEnv = 
+      List.fold_left (fun (e:Env.t) (i:import)  -> 
+        Logs.debug (fun m -> m "processing import %s" i.mname);
+        let sm = In_channel.with_open_bin (i.dir ^ i.mname ^ Constants.mir_file_ext) @@ fun c -> (Marshal.from_channel c : 'a SailModule.t)
+        in
+        Env.add_import_decls (i,sm.declEnv) e 
+      ) smdl.declEnv sorted_imports
+    in
+    {smdl with declEnv}
+  
+
+
+
+  let transform (smdl : in_body SailModule.t)  : out_body SailModule.t E.t =
     Logs.debug (fun m -> m "imports : %s" (String.concat " " (List.map (fun i -> i.mname) (ImportSet.elements smdl.imports))));
-    set_fcall_source smdl
+    set_fcall_source smdl >>| add_imports
 end
 )

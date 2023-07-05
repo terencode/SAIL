@@ -43,17 +43,16 @@ module ECSW = struct
   let get_decl id ty = ECS.bind ECS.get (fun e -> THIREnv.get_decl id ty e |> ECS.pure) |> lift
 end
 
-let get_hint id env = 
-  MonadOption.M.bind (List.nth_opt (THIREnv.get_closest id env) 0) (fun id -> Some (None,Printf.sprintf "Did you mean %s ?" id))
+let get_hint id env = Option.bind (List.nth_opt (THIREnv.get_closest id env) 0) (fun id -> Some (None,Printf.sprintf "Did you mean %s ?" id))
 
 
 
 module Pass =  Pass.MakeFunctionPass(V)
 (
   struct 
-    let name = "Extract method call out of expressions"
+    let name = "Extract method call out of expressions (fixme : should be in hir but requires type inference)"
 
-    type in_body = IrThir.Thir.Pass.out_body
+    type in_body = ThirUtils.statement
     type out_body = in_body
 
     open MonadFunctions(ECSW)    
@@ -91,7 +90,7 @@ module Pass =  Pass.MakeFunctionPass(V)
           let+ m = ListM.map (pairMap2 aux) m in {info; exp=StructAlloc (o,id, m)}
         | EnumAlloc (id, el) ->
           let+ el = ListM.map aux el in  {info;exp=EnumAlloc (id, el)}
-        | MethodCall ((l_id,id), ((_,mname) as origin), el) ->
+        | MethodCall ((l_id,id), ((_,mname) as origin), el) -> (* THIS IS THE PROBLEM : WE NEED TO KNOW THE RETURN TYPE !! *)
           let* m = ECSW.get_decl id (Specific (mname,Method)) in 
           match m with
           | Some (_proto_loc,proto) -> 
@@ -111,11 +110,10 @@ module Pass =  Pass.MakeFunctionPass(V)
         in aux e
   
 
-    let lower_function (f : in_body function_type) env _ : (out_body * THIREnv.D.t) E.t =
+    let lower_function (f : in_body function_type) env _ : (out_body* THIREnv.D.t) E.t =
       let open MonadSyntax(ECS) in
       let open MonadOperator(ECS) in 
-
-      let rec aux (s : statement) : out_body ECS.t = 
+      let rec aux (s : statement) : statement ECS.t = 
         
         let buildSeq s1 s2 = {info=dummy_pos; stmt = Seq (s1, s2)} in 
         let buildStmt stmt = {info=dummy_pos;stmt} in

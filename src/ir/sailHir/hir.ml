@@ -16,12 +16,11 @@ struct
   type in_body = AstParser.statement
   type out_body = statement
       
-  open MonadFunctions(ECSW)
-  open MonadOperator(ECSW)
+  open UseMonad(ECSW)
   open MakeOrderedFunctions(String)
 
   let get_hint id env = 
-    MonadOption.M.bind (List.nth_opt (HIREnv.get_closest id env) 0) (fun id -> Some (None,Printf.sprintf "Did you mean %s ?" id))
+    Option.bind (List.nth_opt (HIREnv.get_closest id env) 0) (fun id -> Some (None,Printf.sprintf "Did you mean %s ?" id))
 
 
   let lower_expression (e : AstParser.expression) : expression ECSW.t = 
@@ -176,7 +175,7 @@ struct
     in
     ECS.run (aux c.body env) |> E.recover ({info=dummy_pos;stmt=Skip},snd env)
 
-    let preprocess (sm: 'a SM.t) : 'a SM.t E.t = 
+    let preprocess (sm: 'a SM.methods_processes SM.t) : 'a SM.methods_processes SM.t E.t = 
       let module ES = struct 
         module S =  MonadState.M(struct type t = D.t end)
         include Error.MakeTransformer(S)
@@ -185,11 +184,9 @@ struct
         let get_env = S.get |> lift
       end 
       in
-      let open MonadSyntax(ES) in
-      let open MonadOperator(ES) in
-      let module F = MonadFunctions(ES) in
-      let module TEnv = F.MakeFromSequencable(SM.DeclEnv.TypeSeq) in
-      let module SEnv = F.MakeFromSequencable(SM.DeclEnv.StructSeq) in
+      let open UseMonad(ES) in
+      let module TEnv = MakeFromSequencable(SM.DeclEnv.TypeSeq) in
+      let module SEnv = MakeFromSequencable(SM.DeclEnv.StructSeq) in
       (* let module MEnv = F.MakeFromSequencable(SM.DeclEnv.MethodSeq) in
       let module PEnv = F.MakeFromSequencable(SM.DeclEnv.ProcessSeq) in *)
       let open SM.DeclEnv in
@@ -216,7 +213,7 @@ struct
         
         let* () = SEnv.iter (
           fun (id,(l,{fields; generics}))  -> 
-            let* fields = F.ListM.map (
+            let* fields = ListM.map (
               fun (name,(l,t,n)) -> 
                 let* env = ES.get_env in 
                 let* t,env = (follow_type t env) |> ES.S.lift in
@@ -229,7 +226,7 @@ struct
         ) (get_own_decls env |> get_decls Struct)
         in
 
-        let* methods = F.ListM.map (
+        let* methods = ListM.map (
           fun ({m_proto;m_body} as m) -> 
             let* rtype = match m_proto.rtype with 
             | None -> return None 
@@ -238,7 +235,7 @@ struct
               let* t,env = (follow_type t env) |> ES.S.lift in
               let+ () = ES.set_env env in Some t
             in
-            let* params = F.ListM.map (
+            let* params = ListM.map (
               fun (({ty;_}:param) as p) -> 
                 let* env = ES.get_env in 
                 let* ty,env = (follow_type ty env) |> ES.S.lift in
@@ -248,11 +245,11 @@ struct
             let true_name = (match m_body with Left (sname,_) -> sname | Right _ -> m_proto.name) in
             let+ () = ES.update_env (update_decl m_proto.name ((m_proto.pos,true_name), defn_to_proto (Method m)) (Self Method)) 
             in m
-        ) sm.methods in
+        ) sm.body.methods in
 
-        let* processes = F.ListM.map (
+        let* processes = ListM.map (
           fun ({p_interface=p,s;p_name;p_pos;_} as pr)  ->
-            let* p = F.ListM.map (
+            let* p = ListM.map (
               fun (({ty;_}:param) as p) -> 
                 let* env = ES.get_env in 
                 let* ty,env = (follow_type ty env) |> ES.S.lift in
@@ -261,7 +258,7 @@ struct
           let p = {pr with p_interface=p,s} in
           let+ () = ES.update_env (update_decl p_name (p_pos, defn_to_proto (Process p)) (Self Process)) 
           in p
-        ) sm.processes in 
+        ) sm.body.processes in 
 
         (* at this point, all types must have an origin *)        
 
@@ -270,7 +267,7 @@ struct
         let+ () = SEnv.iter (fun (id,proto) -> check_non_cyclic_struct id proto declEnv |> ES.S.lift) (get_own_decls declEnv |> get_decls Struct) in
 
         (* Logs.debug (fun m -> m "%s" @@ string_of_declarations declEnv); *)
-        {sm with methods; processes; declEnv}
+        {sm with body=SM.{methods; processes}; declEnv}
       ) sm.declEnv |> fst in
       sm
   end

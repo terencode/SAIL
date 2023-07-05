@@ -228,6 +228,12 @@ module MonadFunctions (M : Monad) = struct
         | [] -> return x
         | h :: t -> f h x >>= fold_right f t
 
+    let rec fold_right2 (f : 'a -> 'b -> 'c -> 'c M.t) (l1 : 'a list) (l2 : 'b list) (x : 'c) : 'c M.t = 
+      match l1,l2 with 
+        | [],[] -> return x
+        | h1 :: t1,h2 :: t2 -> f h1 h2 x >>= fold_right2 f t1 t2
+        | _ -> raise (Invalid_argument "ListM.fold_right2")
+
     let sequence (l : 'a M.t list) : 'a list M.t = map Fun.id l
   end
 

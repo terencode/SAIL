@@ -68,7 +68,7 @@
 %nonassoc ")"
 %nonassoc ELSE
 
-%start <metadata -> statement SailModule.t E.t> sailModule
+%start <metadata -> statement SailModule.methods_processes SailModule.t E.t> sailModule
 
 %% 
 

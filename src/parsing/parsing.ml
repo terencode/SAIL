@@ -20,7 +20,7 @@ let print_error_position lexbuf =
 
 
 
-let fastParse filename : (string * AstParser.statement SailModule.t Error.Logger.t, string) Result.t =
+let fastParse filename : (string * AstParser.statement SailModule.methods_processes SailModule.t Error.Logger.t, string) Result.t =
   let text, lexbuf = L.read filename in
   let hash = Digest.string text in
 
@@ -86,7 +86,7 @@ let slowParse filename text =
 
 
 
-let parse_program filename : AstParser.statement SailModule.t Logger.t = 
+let parse_program filename : AstParser.statement SailModule.methods_processes SailModule.t Logger.t = 
   match fastParse filename with
   | Result.Ok (_,sm) -> sm
   | Result.Error txt -> slowParse filename txt

@@ -76,7 +76,6 @@ let pp_process (pp_process_body : int -> formatter -> 'a -> unit) (pf : formatte
 
 let pp_program (pp_method_body : int -> formatter -> (tag * tag list, 'a) Either.t -> unit) 
 (pp_process_body : int -> formatter -> 'a -> unit)
-((pf : formatter) : formatter) (p : 'a SailModule.t) = 
-  List.iter (pp_method pp_method_body pf) p.methods;
-  List.iter (pp_process pp_process_body pf) p.processes
-      
+((pf : formatter) : formatter) (p : 'a SailModule.methods_processes SailModule.t) = 
+  List.iter (pp_method pp_method_body pf) p.body.methods;
+  List.iter (pp_process pp_process_body pf) p.body.processes

@@ -6,16 +6,16 @@ open Monad.MonadSyntax(E.Logger)
 
 module Pass = Pass.Make( struct
 let name = "Setup / Loop for embedded devices"
-type in_body = IrHir.Hir.Pass.out_body
+type in_body = IrHir.HirUtils.statement SailModule.methods_processes
 type out_body  = in_body
 
 open IrHir.AstHir
- let bs = buildStmt dummy_pos
+let bs = buildStmt dummy_pos
 
-  let createMainProcess (m: in_body SailModule.t) : out_body process_defn Error.Logger.t = 
+  let createMainProcess (m: in_body SailModule.t) : IrHir.HirUtils.statement process_defn Error.Logger.t = 
     let* setup = E.Logger.throw_if_none 
                 (E.make dummy_pos @@ "module '" ^ m.md.name ^ "' : no 'setup' function found" )
-                (List.find_opt (fun m -> m.m_proto.name = "setup") m.methods) 
+                (List.find_opt (fun m -> m.m_proto.name = "setup") m.body.methods) 
 
     in 
     let+ () = E.Logger.throw_if 
@@ -45,10 +45,14 @@ open IrHir.AstHir
 
   let transform (m : in_body SailModule.t)  : out_body SailModule.t E.Logger.t =
     let open SailModule in 
-    let* loop = method_of_process m "Loop" in
+    let* p = E.throw_if_none 
+    (Error.make dummy_pos @@ "module '" ^ m.md.name ^ "' : no 'Loop' process found")
+    (List.find_opt (fun p -> p.p_name = "Loop" ) m.body.processes) 
+  in
+    let loop = method_of_process p in
     let loop_decl = method_decl_of_defn loop in
     let* declEnv = DeclEnv.add_decl loop.m_proto.name loop_decl Method m.declEnv in
     let+ main = createMainProcess m in
-    { m with methods = loop::m.methods ; processes = main :: m.processes ; declEnv} 
+    { m with body={methods = loop::m.body.methods ; processes = main :: m.body.processes} ; declEnv} 
   end
 )

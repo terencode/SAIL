@@ -20,29 +20,28 @@ type statement = ThirUtils.statement
 module Pass = Pass.MakeFunctionPass(V)(
 struct
   let name = "THIR"
-  type in_body = Hir.Pass.out_body
+  type in_body = HirUtils.statement
   type out_body = statement
 
-  let rec lower_lexp (generics : string list) (e : Hir.expression) : expression ES.t = 
+  let rec lower_lexp (e : Hir.expression) : expression ES.t = 
   let rec aux (e:Hir.expression) : expression ES.t = 
     let loc = e.info in  match e.exp with
     | Variable id -> 
-      let+ (_,(_,t)) = ES.get_var id >>=
-                       ES.throw_if_none (Error.make loc @@ Printf.sprintf "unknown variable %s" id) in
+      let+ (_,(_,t)) = ES.get_var id >>= ES.throw_if_none (Error.make loc @@ Printf.sprintf "unknown variable %s" id) in
       buildExp (loc,t) @@ Variable id
 
-    | Deref e -> let* e = lower_rexp generics e in
+    | Deref e -> let* e = lower_rexp e in
       (* return @@ Deref((l,extract_exp_loc_ty e |> snd), e) *)
       begin
         match e.exp with
         | Ref (_,r)  -> return @@ buildExp r.info @@ Deref e
         | _ -> return e
       end
-    | ArrayRead (array_exp,idx) -> let* array_exp = aux array_exp and* idx = lower_rexp generics idx in
+    | ArrayRead (array_exp,idx) -> let* array_exp = aux array_exp and* idx = lower_rexp idx in
       begin 
         match snd array_exp.info with
         | ArrayType (t,sz) -> 
-          let* _ = matchArgParam (idx.info) (Int 32) generics [] in
+          let* _ = matchArgParam (idx.info) (Int 32) in
           begin 
             (* can do a simple oob check if the type is an int literal *)
             match idx.exp with
@@ -56,7 +55,7 @@ struct
         | _ ->  ES.throw (Error.make loc "not an array !")
       end
     | StructRead (origin,e,(fl,field)) ->  
-      let* e = lower_lexp generics e in 
+      let* e = lower_lexp e in 
       let+ origin,t = 
       begin
         match e.info with
@@ -76,7 +75,7 @@ struct
     | _ -> ES.throw (Error.make loc "not a lvalue !")
 
     in aux e
-  and lower_rexp (generics : string list) (e : Hir.expression) : expression ES.t =
+  and lower_rexp (e : Hir.expression) : expression ES.t =
   let rec aux (e:Hir.expression) : expression ES.t = 
     let loc = e.info in match e.exp with
     | Variable id -> 
@@ -105,7 +104,7 @@ struct
       let+ t = check_binop op lt rt |> ES.recover (snd lt) in 
       buildExp (loc,t) @@ BinOp (op,le,re)
 
-    | Ref (mut,e) -> let+ e = lower_lexp generics e in 
+    | Ref (mut,e) -> let+ e = lower_lexp e in 
       let t = RefType (snd e.info,mut) in
       buildExp (loc,t) @@ Ref(mut, e)
     | ArrayStatic el -> 
@@ -113,29 +112,29 @@ struct
       let first_t = snd first_t.info in
       let* el = ListM.map (
         fun e -> let+ e = aux e in
-        matchArgParam e.info first_t [] [] >>| fun _ -> e
+        matchArgParam e.info first_t  >>| fun _ -> e
       ) el in 
       let+ el = ListM.sequence el in
       let t = ArrayType (first_t, List.length el) in 
       buildExp (loc,t) (ArrayStatic el)
 
     | MethodCall ((l,name) as lid,source,el) -> 
-      let* (el: expression list) = ListM.map (lower_rexp generics) el in 
+      let* (el: expression list) = ListM.map lower_rexp el in 
       let* mod_loc,(_realname,m) = find_function_source e.info None lid source el in
       let+ ret = ES.throw_if_none (Error.make e.info "methods in expressions should return a value") m.ret in
       buildExp (loc,ret) (MethodCall ((l,name),mod_loc,el)) 
 
 
-    | ArrayRead _ -> lower_lexp generics e  (* todo : some checking *)
-    | Deref _ -> lower_lexp generics e  (* todo : some checking *)
-    | StructRead _ -> lower_lexp generics e (* todo : some checking *)
+    | ArrayRead _ -> lower_lexp e  (* todo : some checking *)
+    | Deref _ -> lower_lexp e  (* todo : some checking *)
+    | StructRead _ -> lower_lexp e (* todo : some checking *)
     | StructAlloc (origin,name,fields) -> 
       let* origin,(_l,strct) = find_struct_source name origin in
       let struct_fields = List.to_seq strct.fields in 
 
       let fields = FieldMap.(merge (
         fun n f1 f2 -> match f1,f2 with 
-        | Some _, Some e -> Some(let+ e = lower_rexp generics e in (n,e))
+        | Some _, Some e -> Some(let+ e = lower_rexp e in (n,e))
         | None,None -> None 
         | None, Some (e:Hir.expression)  -> Some (ES.throw @@ Error.make e.info @@ Fmt.str "no field '%s' in struct '%s'" n (snd name))
         | Some _, None -> Some (ES.throw @@ Error.make loc @@ Fmt.str "missing field '%s' from struct '%s'" n (snd name))
@@ -145,13 +144,12 @@ struct
 
       let* fields = SeqM.sequence (Seq.map snd fields) in
 
-      let+ () = SeqM.iter2 (fun (_name1,(e:expression)) (_name2,(_,t,_)) -> 
-        let+ _ = matchArgParam e.info t [] [] in ())
+      let+ () = SeqM.iter2 (fun (_name1,(e:expression)) (_name2,(_,t,_)) -> matchArgParam e.info t >>| fun _ -> ())
       fields
       struct_fields
       in
       let ty = CompoundType {origin= Some origin;decl_ty=Some (S ()); name; generic_instances=[]} in 
-       (buildExp (loc,ty) (StructAlloc (origin,name, List.of_seq fields)))
+      (buildExp (loc,ty) (StructAlloc (origin,name, List.of_seq fields)))
 
     | EnumAlloc _ -> ES.throw (Error.make loc "todo enum alloc ")
   in aux e
@@ -161,7 +159,7 @@ struct
     let log_and_skip e = ES.log e >>| fun () -> buildStmt e.where Skip
     in 
 
-    let rec aux (s:in_body) : out_body ES.t = 
+    let rec aux s : out_body ES.t = 
       let loc = s.info in
       let buildStmt = buildStmt loc in 
       match s.stmt with
@@ -170,10 +168,10 @@ struct
           begin
             match opt_t,opt_exp with
             | Some t, Some e -> 
-              let* e = lower_rexp decl.generics e in
-              matchArgParam e.info t decl.generics [] >>| fun _ -> t,Some e
+              let* e = lower_rexp e in
+              matchArgParam e.info t >>| fun _ -> t,Some e
             | None,Some e -> 
-              let+ e = lower_rexp decl.generics e in
+              let+ e = lower_rexp e in
               (snd e.info),Some e
             | Some t,None -> return (t,None)
             | None,None -> ES.throw (Error.make loc "can't infere type with no expression")
@@ -184,9 +182,9 @@ struct
         
         
       | Assign(e1, e2) -> 
-        let* e1 = lower_lexp decl.generics e1
-        and* e2 = lower_rexp decl.generics e2 in
-        matchArgParam e2.info (snd e1.info) [] [] >>|
+        let* e1 = lower_lexp e1
+        and* e2 = lower_rexp e2 in
+        matchArgParam e2.info (snd e1.info) >>|
         fun _ -> buildStmt (Assign(e1, e2))
 
       | Seq(c1, c2) -> 
@@ -196,8 +194,8 @@ struct
 
 
       | If(cond_exp, then_s, else_s) -> 
-        let* cond_exp = lower_rexp decl.generics cond_exp in
-        let* _ = matchArgParam cond_exp.info Bool [] [] in
+        let* cond_exp = lower_rexp cond_exp in
+        let* _ = matchArgParam cond_exp.info Bool  in
         let* res = aux then_s in
         begin
         match else_s with
@@ -212,12 +210,12 @@ struct
       | Break -> return (buildStmt Break)
 
       | Case(e, _cases) ->
-        let+ e = lower_rexp decl.generics e in
+        let+ e = lower_rexp e in
         buildStmt (Case (e, []))
 
 
       | Invoke (var, mod_loc, id, el) -> (* todo: handle var *)
-        let* el = ListM.map (lower_rexp decl.generics) el in 
+        let* el = ListM.map lower_rexp el in 
         let* origin,_ = find_function_source s.info var id mod_loc el in 
         buildStmt (Invoke(var,origin, id,el)) |> return 
 
@@ -229,14 +227,14 @@ struct
         if decl.bt <> Pass.BMethod then 
           log_and_skip (Error.make loc @@ Printf.sprintf "process %s : processes can't return non-void type" decl.name)
         else
-          let* e = lower_rexp decl.generics e in
+          let* e = lower_rexp e in
           let _,t as lt = e.info in 
           begin
           match decl.ret with 
           | None -> 
             log_and_skip (Error.make loc @@ Printf.sprintf "returns %s but %s doesn't return anything"  (string_of_sailtype (Some t)) decl.name)
           | Some r ->
-            let+ _ = matchArgParam lt r decl.generics []  in
+            matchArgParam lt r >>| fun _ ->
             buildStmt (Return (Some e))
           end
 
@@ -252,7 +250,7 @@ struct
       | Await s -> return (buildStmt (When (s, buildStmt Skip)))
       | When (s, c) -> let+ res = aux c in buildStmt (When (s, res))
       | Run (id, el) ->
-        let* el = ListM.map (lower_rexp decl.generics) el in
+        let* el = ListM.map lower_rexp el in
         (* let* _ = check_call (snd id) "" el loc in *)
         buildStmt (Run (id, el)) |> return
 

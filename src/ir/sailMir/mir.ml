@@ -6,9 +6,7 @@ open Monad
 open MirMonad
 open MirUtils
 
-open MonadSyntax(ESC)
-open MonadOperator(ESC)
-open MonadFunctions(ESC) 
+open UseMonad(ESC)
 
 
 open Pass
@@ -17,7 +15,7 @@ module Pass = MakeFunctionPass(V)(
 struct
   let name = "MIR"
   
-  type in_body = Thir.Pass.out_body
+  type in_body = Thir.statement
   type out_body = mir_function
 
   let rec lexpr (e : Thir.expression) : expression ESC.t = 
@@ -47,7 +45,7 @@ struct
       | ArrayStatic el -> let+ el' = ListM.map rexpr el in buildExp lt (ArrayStatic el')
       | StructRead (origin,struct_exp,field)  -> 
         let+ exp = rexpr struct_exp in 
-         buildExp lt (StructRead (origin,exp,field))  
+        buildExp lt (StructRead (origin,exp,field))  
       
       | StructAlloc (origin,id, fields) -> 
         let+ fields = ListM.map (pairMap2 (rexpr)) fields in 
@@ -61,7 +59,7 @@ struct
       open MonadSyntax(E)     
 
 
-  let lower_function decl env (_sm:in_body SailModule.t) : (out_body * SailModule.DeclEnv.t) E.t =
+  let lower_function decl env (_sm:in_body SailModule.methods_processes SailModule.t) : (out_body * SailModule.DeclEnv.t) E.t =
     let _check_function (_,cfg : out_body) : unit E.t = 
       let* ret,unreachable_blocks = cfg_returns cfg in
       if Option.is_some ret && decl.ret <> None then 

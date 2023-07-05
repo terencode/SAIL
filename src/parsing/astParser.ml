@@ -75,7 +75,7 @@ type defn =
   
 module E = Error.Logger
 
-let mk_program  (md:metadata) (imports: ImportSet.t)  l : statement SailModule.t E.t =
+let mk_program  (md:metadata) (imports: ImportSet.t)  l : statement SailModule.methods_processes SailModule.t E.t =
   let open SailModule in
   let open Monad.MonadSyntax(E) in
   let open Monad.MonadOperator(E) in
@@ -118,5 +118,5 @@ let mk_program  (md:metadata) (imports: ImportSet.t)  l : statement SailModule.t
   in 
   let+ (declEnv,methods,processes) = aux l in 
   let builtins = Builtins.get_builtins () in
-  {md; imports; declEnv ; methods;processes;builtins}
+  {md; imports; declEnv ; body={methods;processes};builtins}
 
