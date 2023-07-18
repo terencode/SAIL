@@ -130,13 +130,17 @@ type enum_defn =
   e_injections :  (string * sailtype list) list;
 }
 
+type 'a process_body = {
+    init : loc * 'a ;
+    loop : unit;
+}
 type 'a process_defn = 
 {
   p_pos : loc;
   p_name : string;
   p_generics : string list;
   p_interface : param list * string list;
-  p_body : 'a
+  p_body : 'a process_body ;
 }
 
 type method_sig = 

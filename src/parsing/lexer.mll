@@ -85,7 +85,7 @@ rule read_token = parse
   | "&"  {REF}
   | "and" { AND }
   | "or" { OR }
-  | "||" { PAR }
+  (* | "||" { PAR } *)
   | "!" { NOT }
   | "<=" {LE}
   | ">="  {GE}
@@ -97,6 +97,8 @@ rule read_token = parse
   | "struct" { STRUCT }
   | "enum " { ENUM }
   | "process" { PROCESS }
+  | "Loop" {P_LOOP}
+  | "Init" {P_INIT}
   | "method" { METHOD }
   | "extern" { EXTERN }
   | "import" { IMPORT }
@@ -108,10 +110,11 @@ rule read_token = parse
   | "if" { IF }
   | "else" { ELSE }
   | "return" { RETURN }
+  (*
   | "await" { AWAIT }
   | "emit" { EMIT }
   | "when" {WHEN}
-  | "watching" { WATCHING }
+  | "watching" { WATCHING } *)
   | "mut" {MUT}
   | "array" {ARRAY}
   | "self" {SELF}

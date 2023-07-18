@@ -115,11 +115,11 @@ let ppPrintMethod (pf : Format.formatter) (m: (declaration list * cfg) TypesComm
   | Left _ -> fprintf pf "extern fn %a\n" ppPrintMethodSig m.m_proto
  
 
-let ppPrintProcess (pf : Format.formatter) (p : (declaration list * cfg) Common.TypesCommon.process_defn) : unit = 
-  fprintf pf  "proc %s() {\n%a\n%a}\n" p.p_name (pp_print_list ~pp_sep:pp_semicr ppPrintDeclaration) (fst p.p_body) ppPrintCfg (snd p.p_body)
+(* let ppPrintProcess (pf : Format.formatter) (p : (declaration list * cfg) Common.TypesCommon.process_defn) : unit = 
+  fprintf pf  "proc %s() {\n%a\n%a}\n" p.p_name (pp_print_list ~pp_sep:pp_semicr ppPrintDeclaration) (fst p.p_body) ppPrintCfg (snd p.p_body) *)
 
 
 let ppPrintModule (pf : Format.formatter) (m : (declaration list * cfg) SailModule.methods_processes SailModule.t ) : unit = 
-  fprintf pf "// Sail MIR Representation: %s\n%a \n%a" m.md.name 
+  fprintf pf "// Sail MIR Representation: %s\n%a" m.md.name 
   (pp_print_list ppPrintMethod) m.body.methods
-  (pp_print_list ~pp_sep:pp_comma ppPrintProcess) m.body.processes
+  (* (pp_print_list ~pp_sep:pp_comma ppPrintProcess) m.body.processes *)

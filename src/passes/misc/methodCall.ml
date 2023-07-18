@@ -1,9 +1,9 @@
 open Common
 open TypesCommon
 open Monad
-open IrHir
-open IrThir
 open Pass
+open IrThir
+open IrHir
 
 module V = (
   struct 

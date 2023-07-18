@@ -82,7 +82,7 @@ type 'a function_type =
 let function_type_of_process p = 
   {
       name=p.p_name;
-      body=p.p_body;
+      body=snd p.p_body.init;
       pos=p.p_pos;
       ret=None;
       bt=BProcess;
@@ -132,8 +132,9 @@ struct
     let start_env = VEnv.get_start_env sm.declEnv (fst p.p_interface) in
     let decl = function_type_of_process p in
     let* ve = start_env in
-    let+ p_body,d = T.lower_function decl ve sm in
-    d,{ p with p_body}
+    let+ init,d = T.lower_function decl ve sm in
+    let init = fst p.p_body.init,init in
+    d,{ p with p_body={p.p_body with init}}
 
 
 

@@ -14,23 +14,21 @@ module T = Llvm_target
 module Hir = IrHir.Hir.Pass
 module Thir = IrThir.Thir.Pass
 module Mir = IrMir.Mir.Pass
-module Imports = IrMisc.Imports.Pass
-module MCall = IrMisc.MethodCall.Pass
-module Mono = IrMisc.Monomorphization.Pass
-module SetupLoop = IrMisc.SetupLoop.Pass
-module MProc = IrMisc.SetupMain.Pass
+module Imports = Misc.Imports.Pass
+module MCall = Misc.MethodCall.Pass
+module Mono = Mono.Monomorphization.Pass
+module MProc = Misc.SetupMain.Pass
 
 
 (* error handling *)
 open Monad.UseMonad(E)
 
 
-let apply_passes (sail_module : SailParser.AstParser.statement SailModule.methods_processes SailModule.t) (comp_mode : Cli.comp_mode) : Mono.out_body SailModule.t E.t =
+let apply_passes (sail_module : SailParser.AstParser.statement SailModule.methods_processes SailModule.t) (_comp_mode : Cli.comp_mode) : Mono.out_body SailModule.t E.t =
   let open Pass.Progression in 
-  let active_if cond p = if cond then p else Fun.id in 
+  (* let active_if cond p = if cond then p else Fun.id in  *)
   let passes = Fun.id
     @> Hir.transform 
-    @> active_if (comp_mode = Loop) SetupLoop.transform
     @> Thir.transform 
     @> Imports.transform 
     @> MCall.transform 

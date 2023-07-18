@@ -3,6 +3,6 @@ import print_utils
 method f(x : int) : int{
     return x;
 }
-process Main(){
+method main(){
     print_int(f(1));
 }

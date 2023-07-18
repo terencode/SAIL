@@ -65,7 +65,6 @@ type statement = loc * statement_ and statement_ =
   | Watching of string * statement
   | Block of statement
 
- 
 type defn =
   | Type of ty_defn
   | Struct of struct_defn

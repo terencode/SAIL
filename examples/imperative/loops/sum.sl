@@ -1,4 +1,5 @@
 import print_utils
+
 method sumTo(n : int) : int{
     var mut res : int = 0;
     var mut cpt : int = 0;
@@ -9,7 +10,7 @@ method sumTo(n : int) : int{
     return res
 }
 
-process Main(){
+method main(){
     print_int(sumTo(10));
     print_newline();
 }

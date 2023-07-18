@@ -1,4 +1,5 @@
 import print_utils
-process Main(){
+
+method main(){
     print_string("Hello World\n")
 }

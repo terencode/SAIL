@@ -1,5 +1,6 @@
 import print_utils
-process Main(){
+
+method main(){
     var mut x : int = 0;
     while (x < 10){
         print_string("Hello\n");

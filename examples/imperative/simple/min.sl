@@ -1,4 +1,5 @@
 import print_utils
+
 method min(x : int, y : int, z : int) : int {
     if (x < y) 
         if (y < z) return x
@@ -8,8 +9,7 @@ method min(x : int, y : int, z : int) : int {
         else if (y < z) return y else return z
 }
 
-process Main(){
-
+method main(){
     var x : int;
     x = min(5,3,6);
     print_int(x);

@@ -44,7 +44,8 @@
 %token METHOD PROCESS STRUCT ENUM 
 %token VAR SIGNAL 
 %token IF ELSE WHILE RETURN BREAK
-%token AWAIT EMIT WATCHING WHEN PAR "||"
+// %token AWAIT EMIT WATCHING WHEN PAR "||"
+%token P_LOOP P_INIT
 %token TRUE FALSE 
 %token PLUS "+" MINUS "-" MUL "*" DIV "/" REM "%"
 %token LE "<=" GE ">=" EQ "==" NEQ "!="
@@ -87,7 +88,7 @@ let defn ==
 | METHOD ; name=ID ; generics=generic ; LPAREN ; params=separated_list(COMMA, mutable_var(sailtype)) ; RPAREN ; rtype=returnType ; body = block ; 
     {Method [{m_proto={pos=$loc;name; generics; params; variadic=false; rtype=rtype }; m_body = Either.right body}]}
 
-| PROCESS ; p_name = UID ; p_generics=generic ; p_interface=parenthesized(interface) ; p_body =block ;
+| PROCESS ; p_name = UID ; p_generics=generic ; p_interface=parenthesized(interface) ; p_body = delimited("{", process_body, "}") ;
     {Process ({p_pos=$loc;p_name; p_generics; p_interface; p_body})}
 
 | EXTERN ; lib=STRING? ; protos =  delimited("{", separated_nonempty_list_opt(";", extern_sig), "}") ;
@@ -97,6 +98,10 @@ let defn ==
             {m_proto=p; m_body=Either.left (sid,lib)}
     ) protos in Method protos}
 
+
+
+let process_body == vardecl* ; init=preceded(P_INIT,block)?; loop=midrule(preceded(P_LOOP,block)? ; {()}) ; 
+    {let init : loc * statement = match init with None -> $loc,($loc,Skip) | Some b -> $loc,b in  {init;loop} : statement process_body }
 
 let extern_sig == METHOD ; name=ID ; LPAREN ;  params=separated_list(COMMA, mutable_var(sailtype)) ; variadic=boption(VARARGS) ; RPAREN ; rtype=returnType ; ext_name=preceded("=",STRING)? ;
         { (match ext_name with Some n -> n | None -> name),{pos=$loc; name; generics=[]; params; variadic; rtype=rtype} }
@@ -112,7 +117,7 @@ let returnType == preceded(":", sailtype)?
 let mutable_var(X) == (loc,id) = located(ID) ; COLON ; mut = mut ; ty =X ; { {id;mut;loc;ty} }
 
 let separated_nonempty_list_opt(separator, X) :=
-  x = X ; separator?  ; { [ x ] }
+| x = X ; separator?  ; { [ x ] }
 | x = X; separator; xs = separated_nonempty_list_opt(separator, X) ; { x :: xs }
 
 
@@ -184,8 +189,8 @@ let block_or_statement(b) ==
     | LOOP ; ~ = b ; <Loop>
     | IF ; e = parenthesized(expression) ; s1 = b ; {If(e, s1, None)}
     | IF ; e = parenthesized(expression) ; s1 = single_statement ; ELSE ; s2 = b ; {If(e, s1, Some s2)}
-    | WATCHING ; ~ = ID ; s = b ; <Watching>
-    | WHEN ; ~ = ID ; ~ = block ; <When>
+    // | WATCHING ; ~ = ID ; s = b ; <Watching>
+    // | WHEN ; ~ = ID ; ~ = block ; <When>
     | FOR ; var = ID; IN ; iterable=parenthesized(located(iterable_or_range)) ; body = b ; { For {var;iterable; body} }
 
 
@@ -200,20 +205,21 @@ let iterable_or_range ==
 
 let single_statement := 
 | located (
-    | VAR ; ~ = mut ; ~ = ID ; ~ = preceded(":", sailtype)? ; ~ = preceded("=",expression)? ; <DeclVar>
-    | SIGNAL ; ~ = ID ; <DeclSignal>
+    | vardecl
+    // | SIGNAL ; ~ = ID ; <DeclSignal>
     | l = expression ; "=" ; e = expression ; <Assign>
     | CASE ; ~ = parenthesized(expression) ; ~ = brace_del_sep_list(",", case) ; <Case>
     | ~ = ioption(module_loc) ; ~ = located(ID) ; ~ = parenthesized(separated_list(",", expression)) ; <Invoke>
     | RETURN ; ~ = expression? ; <Return>
     | ~ = located(UID) ; ~ = parenthesized(separated_list(",", expression )) ; <Run>
-    | EMIT ; ~ = ID ; <Emit>
-    | AWAIT ; ~ = ID ; <Await>
+    // | EMIT ; ~ = ID ; <Emit>
+    // | AWAIT ; ~ = ID ; <Await>
     | BREAK ; <Break>
     | block_or_statement(single_statement)
     )
 | block
 
+let vardecl == VAR ; ~ = mut ; ~ = ID ; ~ = preceded(":", sailtype)? ; ~ = preceded("=",expression)? ; <DeclVar>
 
 let brace_del_sep_list(sep,x) == delimited("{", separated_nonempty_list_opt(sep, x), "}") 
 
@@ -228,19 +234,19 @@ let module_loc ==  ~ = located(ID); DCOLON ; <> | x = located(SELF) ; DCOLON; { 
 let parenthesized(e) == delimited("(",e,")")
 
 
-let statement_seq := 
+let statement := 
 | single_statement
 | terminated(single_statement, ";")
 | located (
-    | ~ = left ; ~ = statement_seq ; <Seq>
-    | ~ = single_statement ; ";" ; ~ = statement_seq ; <Seq>
+    | ~ = left ; ~ = statement ; <Seq>
+    | ~ = single_statement ; ";" ; ~ = statement ; <Seq>
 )
 
 let left == block | located (block_or_statement(block))
 
-let statement := 
-| statement_seq
-| located(  ~ = statement_seq ; "||" ; ~ = statement ; <Par>)
+// let statement := 
+// | statement_seq
+// | located(  ~ = statement_seq ; "||" ; ~ = statement ; <Par>)
 
 
 let pattern :=

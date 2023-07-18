@@ -47,10 +47,3 @@ let method_decl_of_defn (d : 'a method_defn) : Declarations.method_decl =
   and generics = d.m_proto.generics 
   and variadic = d.m_proto.variadic in
   ((pos,name),{ret;args;generics;variadic})
-  
-
-let method_of_process (p : 'a process_defn): 'a method_defn = 
-  let open Monad.MonadSyntax(E) in
-  let m_proto = {pos=p.p_pos; name=String.lowercase_ascii p.p_name; generics = p.p_generics; params = fst p.p_interface; variadic=false; rtype=None} 
-  and m_body = Either.right p.p_body in
-  {m_proto;m_body}

@@ -1,11 +1,11 @@
 open AstMir
-open IrThir
 open Common 
 open TypesCommon
 open Monad
 open MirMonad
 open MirUtils
-
+open IrThir
+open IrHir
 open UseMonad(ESC)
 
 
@@ -19,7 +19,7 @@ struct
   type out_body = mir_function
 
   let rec lexpr (e : Thir.expression) : expression ESC.t = 
-    let open IrHir.AstHir in
+    let open AstHir in
     let lt = e.info in 
     match e.exp with 
       | Variable name ->
@@ -32,7 +32,7 @@ struct
       |  _ ->  ESC.error @@ Error.make (fst lt) @@ "thir didn't lower correctly this expression" 
   and rexpr (e : Thir.expression) : expression ESC.t = 
     let lt = e.info in 
-    let open IrHir.AstHir in
+    let open AstHir in
     match e.exp with 
       | Variable name ->
         let+ id = find_scoped_var name in buildExp lt (Variable id)
@@ -109,7 +109,7 @@ struct
           get_scoped_var name (curr_lbl + 1)
         in
         let* () = ESC.declare_var loc id {ty;mut;name} in
-        let target = IrHir.AstHir.buildExp (loc,ty) (Variable id) in
+        let target = AstHir.buildExp (loc,ty) (Variable id) in
         let+ bn = assignBasicBlock loc {location=loc; target; expression }  in
         [{location=loc; mut; id=id; varType=ty}],bn
         (* ++ other statements *)

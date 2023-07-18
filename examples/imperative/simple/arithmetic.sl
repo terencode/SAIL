@@ -1,5 +1,6 @@
 import print_utils
-process Main(){
+
+method main() {
     var x : int = 0;
     var z : int;
     {

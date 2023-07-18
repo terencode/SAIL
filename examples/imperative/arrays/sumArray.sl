@@ -1,5 +1,6 @@
 import print_utils
-process Main(){
+
+method main(){
     var mut a : array<int;10> = [1,2,3,4,5,6,7,8,9,10];
     print_string("Hello World\n"); 
 

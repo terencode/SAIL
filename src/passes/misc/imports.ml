@@ -1,5 +1,6 @@
 open Common
 open TypesCommon
+open IrThir
 open IrMir
 
 module E = Common.Error.Logger
@@ -14,7 +15,7 @@ List.map (fun i ->
 
 module Pass = Pass.Make( struct
   let name = "Get imported modules imports"
-  type in_body = IrThir.ThirUtils.statement SailModule.methods_processes
+  type in_body = ThirUtils.statement SailModule.methods_processes
   type out_body  = in_body
 
   let set_fcall_source (m:in_body SailModule.t) : out_body SailModule.t E.t = 

@@ -1,8 +1,8 @@
 open Common
 open TypesCommon
-open IrHir
 open ThirMonad
 open Monad
+open IrHir
 module D = SailModule.Declarations
 
 open MonadSyntax(ES)

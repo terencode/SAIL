@@ -2,6 +2,8 @@ open Llvm
 open Common
 open TypesCommon
 open Env
+open Mono
+open IrMir
 module E = Error.Logger
 
 open Monad.UseMonad(E)
@@ -10,7 +12,7 @@ open MakeOrderedFunctions(ImportCmp)
 module Declarations = struct
   include SailModule.Declarations
   type process_decl = unit
-  type method_decl = {defn : IrMir.AstMir.mir_function method_defn ; llval :  llvalue ; extern : bool}
+  type method_decl = {defn : AstMir.mir_function method_defn ; llval :  llvalue ; extern : bool}
   type struct_decl = {defn : struct_proto; ty : lltype}
   type enum_decl = unit
 end
@@ -29,7 +31,7 @@ module SailEnv = VariableDeclEnv (Declarations)(
 
 open Declarations
 
-type in_body = IrMisc.Monomorphization.Pass.out_body
+type in_body = Monomorphization.Pass.out_body
 
 
 let getLLVMBasicType f t llc llm  : lltype = 
@@ -178,7 +180,7 @@ let get_declarations (sm: in_body SailModule.t) llc llm : DeclEnv.t E.t =
   let* decls = 
     ListM.fold_left (fun (e:DeclEnv.t) (i:import)  -> 
       Logs.debug (fun m -> m "processing import %s" i.mname);
-      let sm = In_channel.with_open_bin (i.dir ^ i.mname ^ Constants.mir_file_ext) @@ fun c -> (Marshal.from_channel c : IrMisc.Monomorphization.Pass.out_body SailModule.t)
+      let sm = In_channel.with_open_bin (i.dir ^ i.mname ^ Constants.mir_file_ext) @@ fun c -> (Marshal.from_channel c : Monomorphization.Pass.out_body SailModule.t)
       in
       (* putting import methods,types,structs and enums into mir env *)
       let empty_env = DeclEnv.(empty |> set_name i.mname |> replace_imports_with e) in

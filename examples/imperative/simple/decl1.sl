@@ -1,5 +1,6 @@
 import print_utils
-process Main(){
+
+method main() {
     var x : int;
     x = 3;
     print_int(x);

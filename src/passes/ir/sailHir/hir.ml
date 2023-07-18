@@ -9,6 +9,7 @@ module SM = SailModule
 type expression = HirUtils.expression
 type statement = HirUtils.statement
 
+
 module Pass = Pass.MakeFunctionPass (V)(
 struct
   let name = "HIR"

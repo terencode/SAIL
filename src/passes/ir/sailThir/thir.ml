@@ -1,11 +1,10 @@
 open Common
 open Pass
 open TypesCommon
-open IrHir
 open Error
 open Monad
+open IrHir
 open AstHir
-
 open ThirMonad
 open ThirUtils
 
