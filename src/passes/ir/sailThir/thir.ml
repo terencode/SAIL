@@ -1,10 +1,10 @@
 open Common
-open Pass
 open TypesCommon
 open Error
 open Monad
 open IrHir
 open AstHir
+open SailParser
 open ThirMonad
 open ThirUtils
 
@@ -19,8 +19,12 @@ type statement = ThirUtils.statement
 module Pass = Pass.MakeFunctionPass(V)(
 struct
   let name = "THIR"
-  type in_body = HirUtils.statement
-  type out_body = statement
+  type m_in = HirUtils.statement
+  type m_out = statement
+
+  type p_in =  (m_in,HirUtils.expression) AstParser.process_body
+  type p_out =  p_in
+
 
   let rec lower_lexp (e : Hir.expression) : expression ES.t = 
   let rec aux (e:Hir.expression) : expression ES.t = 
@@ -154,11 +158,11 @@ struct
   in aux e
 
 
-  let lower_function (decl:in_body function_type) (env:THIREnv.t) _ : (out_body * THIREnv.D.t) E.t = 
+  let lower_method (body,proto : _ * method_sig) (env:THIREnv.t) _ : (m_out * THIREnv.D.t) E.t = 
     let log_and_skip e = ES.log e >>| fun () -> buildStmt e.where Skip
     in 
 
-    let rec aux s : out_body ES.t = 
+    let rec aux s : m_out ES.t = 
       let loc = s.info in
       let buildStmt = buildStmt loc in 
       match s.stmt with
@@ -219,19 +223,16 @@ struct
         buildStmt (Invoke(var,origin, id,el)) |> return 
 
       | Return None as r -> 
-        if decl.ret = None then return (buildStmt r) else 
-          log_and_skip (Error.make loc @@ Printf.sprintf "void return but %s returns %s" decl.name (string_of_sailtype decl.ret))
+        if proto.rtype = None then return (buildStmt r) else 
+          log_and_skip (Error.make loc @@ Printf.sprintf "void return but %s returns %s" proto.name (string_of_sailtype proto.rtype))
 
       | Return (Some e) ->
-        if decl.bt <> Pass.BMethod then 
-          log_and_skip (Error.make loc @@ Printf.sprintf "process %s : processes can't return non-void type" decl.name)
-        else
           let* e = lower_rexp e in
           let _,t as lt = e.info in 
           begin
-          match decl.ret with 
+          match proto.rtype with 
           | None -> 
-            log_and_skip (Error.make loc @@ Printf.sprintf "returns %s but %s doesn't return anything"  (string_of_sailtype (Some t)) decl.name)
+            log_and_skip (Error.make loc @@ Printf.sprintf "returns %s but %s doesn't return anything"  (string_of_sailtype (Some t)) proto.name)
           | Some r ->
             matchArgParam lt r >>| fun _ ->
             buildStmt (Return (Some e))
@@ -244,29 +245,13 @@ struct
           buildStmt (Block res)
 
       | Skip -> return (buildStmt Skip)
-      | Watching (s, c) -> let+ res = aux c in buildStmt (Watching (s, res))
-      | Emit s -> return (buildStmt (Emit s))
-      | Await s -> return (buildStmt (When (s, buildStmt Skip)))
-      | When (s, c) -> let+ res = aux c in buildStmt (When (s, res))
-      | Run (id, el) ->
-        let* el = ListM.map lower_rexp el in
-        (* let* _ = check_call (snd id) "" el loc in *)
-        buildStmt (Run (id, el)) |> return
-
-      | Par (c1, c2) -> 
-        let* env = ES.get in 
-        let* c1 = aux c1 in
-        ES.set env >>= fun () -> 
-        let+ c2 = aux c2 in
-        buildStmt (Par (c1, c2))
-
-
-      | DeclSignal s -> return (buildStmt (DeclSignal s))
-
 
     in 
-    ES.run (aux decl.body env) |> Logger.recover (buildStmt dummy_pos Skip,snd env)
+    ES.run (aux body env) |> Logger.recover (buildStmt dummy_pos Skip,snd env)
 
     let preprocess = Logger.pure
+
+    let lower_process (c:p_in process_defn) env _ = E.pure (c.p_body,snd env)
+
   end
 )

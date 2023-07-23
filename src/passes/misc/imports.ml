@@ -2,6 +2,8 @@ open Common
 open TypesCommon
 open IrThir
 open IrMir
+open IrHir
+open SailParser
 
 module E = Common.Error.Logger
 module Env = SailModule.DeclEnv
@@ -15,7 +17,7 @@ List.map (fun i ->
 
 module Pass = Pass.Make( struct
   let name = "Get imported modules imports"
-  type in_body = ThirUtils.statement SailModule.methods_processes
+  type in_body = (ThirUtils.statement,(HirUtils.statement,HirUtils.expression) AstParser.process_body) SailModule.methods_processes
   type out_body  = in_body
 
   let set_fcall_source (m:in_body SailModule.t) : out_body SailModule.t E.t = 

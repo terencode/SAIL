@@ -74,11 +74,7 @@ module MonadOperator (M : Monad) = struct
   let (<&>) = fun x f -> M.fmap f x
   let (>>=) = M.bind
   let (>>|) x f = x >>= fun x -> f x |> M.pure
-  (* let (>>) x (lazy y) = x >>= fun _ -> y *)
-  (* 
-  requires lazy, otherwise y is evaluated even if the behaviour of bind doesn't execute its right argument 
-    however lazy values are not handled by coq_of_ocaml...
-  *)
+  let (>>) x y = x >>= fun _ -> y ()
 end
 
 module MonadSyntax (M : Monad ) = struct 

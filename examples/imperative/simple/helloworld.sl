@@ -1,5 +1,9 @@
-import print_utils
+import test_utils
 
-method main(){
-    print_string("Hello World\n")
+process Main() {
+Init:
+Loop:
+
+    print_string("Hello World\n");
+    exit(0);
 }

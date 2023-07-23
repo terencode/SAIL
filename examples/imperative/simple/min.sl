@@ -1,4 +1,4 @@
-import print_utils
+import test_utils
 
 method min(x : int, y : int, z : int) : int {
     if (x < y) 
@@ -9,9 +9,13 @@ method min(x : int, y : int, z : int) : int {
         else if (y < z) return y else return z
 }
 
-method main(){
+process Main() {
+Init:
+Loop:
+
     var x : int;
     x = min(5,3,6);
     print_int(x);
-    print_newline()
+    print_newline();
+    exit(0);
 }

@@ -6,6 +6,7 @@ open MirMonad
 open MirUtils
 open IrThir
 open IrHir
+open SailParser
 open UseMonad(ESC)
 
 
@@ -15,8 +16,10 @@ module Pass = MakeFunctionPass(V)(
 struct
   let name = "MIR"
   
-  type in_body = Thir.statement
-  type out_body = mir_function
+  type m_in = Thir.statement
+  type m_out = mir_function
+  type p_in =  (HirUtils.statement,HirUtils.expression) AstParser.process_body
+  type p_out = p_in
 
   let rec lexpr (e : Thir.expression) : expression ESC.t = 
     let open AstHir in
@@ -59,11 +62,11 @@ struct
       open MonadSyntax(E)     
 
 
-  let lower_function decl env (_sm:in_body SailModule.methods_processes SailModule.t) : (out_body * SailModule.DeclEnv.t) E.t =
-    let _check_function (_,cfg : out_body) : unit E.t = 
+  let lower_method (body,proto : m_in * method_sig) env (_sm: (m_in,p_in) SailModule.methods_processes SailModule.t) : (m_out * SailModule.DeclEnv.t) E.t =
+    let _check_function (_,cfg : m_out) : unit E.t = 
       let* ret,unreachable_blocks = cfg_returns cfg in
-      if Option.is_some ret && decl.ret <> None then 
-        E.log @@ Error.make (Option.get ret) @@ Printf.sprintf "%s doesn't always return !" decl.name
+      if Option.is_some ret && proto.rtype <> None then 
+        E.log @@ Error.make (Option.get ret) @@ Printf.sprintf "%s doesn't always return !" proto.name
       else
         let () = BlockMap.iter (fun lbl {location=_;_} ->  Logs.debug (fun m -> m "unreachable block %i" lbl)) unreachable_blocks in
         try 
@@ -74,21 +77,21 @@ struct
           E.log @@ Error.make bb.location "unreachable code"
         with Not_found -> E.pure ()
     in
-    let check_returns (decls,cfg as res : out_body) : out_body E.t = 
+    let check_returns (decls,cfg as res : m_out) : m_out E.t = 
       (* we make sure the last block returns for void methods *)
       let last_bb = BlockMap.find cfg.output cfg.blocks in
-      match last_bb.terminator,decl.ret with
+      match last_bb.terminator,proto.rtype with
       | None,None -> 
         let last_bb = {last_bb with terminator= Some (Return None)} in (* we insert void return *) 
         let blocks = BlockMap.add cfg.output last_bb cfg.blocks in
         (decls,{cfg with blocks}) |> E.pure
-      | None,Some _  when  LabelSet.is_empty last_bb.predecessors -> E.throw @@ Error.make decl.pos 
+      | None,Some _  when  LabelSet.is_empty last_bb.predecessors -> E.throw @@ Error.make proto.pos 
         @@ Printf.sprintf "no return statement but must return %s" 
-        @@ string_of_sailtype decl.ret
+        @@ string_of_sailtype proto.rtype
       | _ -> res |> E.pure
     in
 
-    let rec aux (s : Thir.statement) : out_body ESC.t = 
+    let rec aux (s : Thir.statement) : m_out ESC.t = 
       let open MonadSyntax(ESC) in 
       let open MonadFunctions(ESC) in 
       let loc = s.info in
@@ -167,8 +170,7 @@ struct
         let+ ret =  buildReturn loc e in
         ([], ret)
 
-      | Run _ | Emit _ | Await _ | When _  | Watching _ 
-      | Par _  | Case _ | DeclSignal _ -> ESC.error @@ Error.make loc "unimplemented"
+      | Case _ -> ESC.error @@ Error.make loc "unimplemented"
 
       | Block s -> 
         let* env = ESC.get_env in
@@ -177,9 +179,9 @@ struct
         res
 
     in 
-    Logs.debug (fun m -> m "lowering to MIR %s" decl.name);
+    Logs.debug (fun m -> m "lowering to MIR %s" proto.name);
 
-    let* (res,_),_env = aux decl.body 0 (fst env) in 
+    let* (res,_),_env = aux body 0 (fst env) in 
     
     (* some analysis passes *)
     (* let* () = check_function res in *)
@@ -193,5 +195,7 @@ struct
     res,(snd env)
 
     let preprocess = Error.Logger.pure
+
+    let lower_process (c:p_in process_defn) env _ = E.pure (c.p_body,snd env)
   end
 )

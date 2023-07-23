@@ -1,4 +1,4 @@
-import print_utils
+import test_utils
 
 method sumTo(n : int) : int{
     var mut res : int = 0;
@@ -10,7 +10,11 @@ method sumTo(n : int) : int{
     return res
 }
 
-method main(){
+process Main() {
+Init:
+Loop:
+
     print_int(sumTo(10));
     print_newline();
+    exit(0);
 }

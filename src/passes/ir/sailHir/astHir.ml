@@ -40,22 +40,23 @@ type ('info,'import) expression = {info: 'info ; exp: ('info,'import) _expressio
 
 type ('info,'import,'exp) statement = {info: 'info; stmt: ('info,'import,'exp) _statement} and ('info,'import,'exp) _statement =
   | DeclVar of bool * string * sailtype option * 'exp option 
-  | DeclSignal of string
   | Skip
   | Assign of 'exp * 'exp
   | Seq of ('info,'import,'exp) statement * ('info,'import,'exp) statement
-  | Par of ('info,'import,'exp) statement * ('info,'import,'exp) statement
   | If of 'exp * ('info,'import,'exp) statement * ('info,'import,'exp) statement option
   | Loop of ('info,'import,'exp) statement
   | Break
   | Case of 'exp * (string * string list * ('info,'import,'exp) statement) list
   | Invoke of string option * 'import * l_str * 'exp list
   | Return of 'exp option
-  | Run of l_str * 'exp list
+  (*
+  | DeclSignal of string
   | Emit of string
   | Await of string
   | When of string * ('info,'import,'exp) statement
   | Watching of string * ('info,'import,'exp) statement
+  | Par of ('info,'import,'exp) statement * ('info,'import,'exp) statement
+  *)
   | Block of ('info,'import,'exp) statement
 
 let buildExp info (exp: (_,_) _expression) : (_,_) expression = {info;exp}

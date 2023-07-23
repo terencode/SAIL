@@ -1,4 +1,4 @@
-import print_utils
+import test_utils
 method add<T>(n1 : T, n2 : T) : T {
 	var x : T = n1;
 	var y : T = n2;
@@ -19,4 +19,5 @@ process Main() {
 
 //      printf("%b\n", b);
 //	printf("%c\n", c);
+    exit(0);
 }

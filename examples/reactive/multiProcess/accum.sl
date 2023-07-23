@@ -1,4 +1,4 @@
-import print_utils
+import test_utils
 process M(var i : int, o : int; signal s)
 {
 	while (true) {
@@ -26,5 +26,6 @@ process Main() {
 	var o : int;
 	i = 0;
 	o = 0;
-	{ M(i,o,s) || N(i,o,s)}
+	{ M(i,o,s) || N(i,o,s)    exit(0);
+}
 } 

@@ -14,7 +14,7 @@ module DeclEnv = Env.DeclarationsEnv(Declarations)
 module SailEnv = Env.VariableDeclEnv(Declarations) 
 
 
-type 'a methods_processes  = {methods : 'a method_defn list ; processes : 'a process_defn list; }
+type ('m,'p) methods_processes  = {methods : 'm method_defn list ; processes : 'p process_defn list; }
 
 type 'a t =
 {

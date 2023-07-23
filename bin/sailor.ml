@@ -1,9 +1,9 @@
 open Common
 open TypesCommon
+open SailParser
 module E = Error.Logger
 module Const  = Constants
 module C = Codegen
-module P = SailParser.Parsing
 
 (* llvm *)
 module L = Llvm
@@ -11,30 +11,29 @@ module T = Llvm_target
 
 
 (* passes *)
+module ProcessPass = ProcessPass.Process.Pass
 module Hir = IrHir.Hir.Pass
 module Thir = IrThir.Thir.Pass
 module Mir = IrMir.Mir.Pass
 module Imports = Misc.Imports.Pass
 module MCall = Misc.MethodCall.Pass
 module Mono = Mono.Monomorphization.Pass
-module MProc = Misc.SetupMain.Pass
-
 
 (* error handling *)
 open Monad.UseMonad(E)
 
 
-let apply_passes (sail_module : SailParser.AstParser.statement SailModule.methods_processes SailModule.t) (_comp_mode : Cli.comp_mode) : Mono.out_body SailModule.t E.t =
+let apply_passes (sail_module : Hir.in_body SailModule.t) (comp_mode : Cli.comp_mode) : Mono.out_body SailModule.t E.t =
   let open Pass.Progression in 
-  (* let active_if cond p = if cond then p else Fun.id in  *)
+  let active_if cond p = if cond then p else Fun.id in 
   let passes = Fun.id
     @> Hir.transform 
+    @> active_if (comp_mode <> Library) ProcessPass.transform
     @> Thir.transform 
     @> Imports.transform 
     @> MCall.transform 
     @> Mir.transform 
     @> Mono.transform
-    @> MProc.transform 
     @> finish 
   in run passes (return sail_module)
     
@@ -196,7 +195,7 @@ let sailor (files: string list) (intermediate:bool) (jit:bool) (noopt:bool) (dum
         imports curr_env 
     in
 
-      let* slmd = P.parse_program f in 
+      let* slmd = Parsing.parse_program f in 
       let process_imports_and_compile () : string list E.t =
         let open MakeOrderedFunctions(ImportCmp) in 
         Logs.info (fun m -> m "======= processing module '%s' =======" slmd.md.name );

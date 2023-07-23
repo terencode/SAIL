@@ -1,9 +1,9 @@
 open Common
 open TypesCommon
 open Monad
-open Pass
 open IrThir
 open IrHir
+open SailParser
 
 module V = (
   struct 
@@ -52,8 +52,11 @@ module Pass =  Pass.MakeFunctionPass(V)
   struct 
     let name = "Extract method call out of expressions (fixme : should be in hir but requires type inference)"
 
-    type in_body = ThirUtils.statement
-    type out_body = in_body
+    type m_in = ThirUtils.statement
+    type m_out = m_in
+
+    type p_in = (HirUtils.statement,HirUtils.expression) AstParser.process_body
+    type p_out = p_in
 
     open MonadFunctions(ECSW)    
     open MakeOrderedFunctions(String)
@@ -110,7 +113,7 @@ module Pass =  Pass.MakeFunctionPass(V)
         in aux e
   
 
-    let lower_function (f : in_body function_type) env _ : (out_body* THIREnv.D.t) E.t =
+    let lower_method (body,_proto : m_in * method_sig ) env _ : (m_out * THIREnv.D.t) E.t =
       let open MonadSyntax(ECS) in
       let open MonadOperator(ECS) in 
       let rec aux (s : statement) : statement ECS.t = 
@@ -161,21 +164,14 @@ module Pass =  Pass.MakeFunctionPass(V)
               buildSeqStmt s (Return (Some e))
             end
         | Block c -> let+ c = aux c in buildStmt (Block c)
-        
-        | Run (lid, el) -> 
-          let+ el,s = ListM.map lower_expression el in 
-          buildSeqStmt s (Run(lid, el))
-        | DeclSignal s -> return @@ buildStmt (DeclSignal s)
-        | Emit s -> return @@ buildStmt (Emit s)
-        | Await s -> return @@ buildStmt @@ When (s, buildStmt Skip)
-        | When (s, c) -> let+ c = aux c in buildStmt (When (s, c))
-        | Watching (s, c) ->  let+ c = aux c in buildStmt (Watching (s, c))
-        | Par (c1, c2) ->  let+ c1 = aux c1 and* c2 = aux c2 in buildStmt (Par(c1,c2))
     
         in
-        ECS.run (aux f.body env) |> E.recover ({info=dummy_pos;stmt=Skip},snd env)
+        ECS.run (aux body env) |> E.recover ({info=dummy_pos;stmt=Skip},snd env)
 
-        let preprocess = Error.Logger.pure
+    let preprocess = Error.Logger.pure
+
+    let lower_process (c:p_in process_defn) env _ = E.pure (c.p_body,snd env)
+
   end
 )
 

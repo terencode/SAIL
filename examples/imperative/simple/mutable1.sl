@@ -1,4 +1,4 @@
-import print_utils
+import test_utils
 process Main()
 {
     var mut x : int;

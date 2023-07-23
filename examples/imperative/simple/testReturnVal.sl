@@ -1,8 +1,12 @@
-import print_utils
+import test_utils
 
 method f(x : int) : int{
     return x;
 }
-method main(){
+process Main() {
+Init:
+Loop:
+
     print_int(f(1));
+    exit(0);
 }

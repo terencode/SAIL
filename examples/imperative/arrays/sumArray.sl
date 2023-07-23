@@ -1,6 +1,9 @@
-import print_utils
+import test_utils
 
-method main(){
+process Main() {
+Init:
+Loop:
+
     var mut a : array<int;10> = [1,2,3,4,5,6,7,8,9,10];
     print_string("Hello World\n"); 
 
@@ -12,5 +15,6 @@ method main(){
         cpt = cpt + 1
     }
     print_int (res); print_newline();
-    print_string("Hello\n")
+    print_string("Hello\n");
+    exit(0);
 }

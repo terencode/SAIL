@@ -1,6 +1,9 @@
-import print_utils
+import test_utils
 
-method main() {
+process Main() {
+    Init:
+    Loop:
+
     var x : int = 0;
     var z : int;
     {
@@ -9,5 +12,7 @@ method main() {
         z = y
     }
     print_int(z);
-    print_newline()
+    print_newline();
+    exit(0);
+    exit(0);
 }

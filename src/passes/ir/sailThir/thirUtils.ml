@@ -78,7 +78,7 @@ let matchArgParam (l,arg: loc * sailtype) (m_param : sailtype) : sailtype  ES.t 
     return arg
 
   | _ -> let* param = string_of_sailtype_thir (Some m_param) 
-         and* arg = string_of_sailtype_thir (Some arg) in 
+          and* arg = string_of_sailtype_thir (Some arg) in 
     ES.throw @@ Error.make l @@ Printf.sprintf "wants %s but %s provided" param arg                                      
                               
   in aux arg m_param 
@@ -106,7 +106,7 @@ let check_call (name:string) (f : function_proto) (args: expression list) loc : 
     ListM.iter2 
     (
       fun (ca:expression) ({ty=a;_}:param) ->
-       let+ _ = matchArgParam ca.info a in ()
+        let+ _ = matchArgParam ca.info a in ()
     ) args f.args
     
 
@@ -123,7 +123,7 @@ let find_function_source (fun_loc:loc) (_var: string option) (name : l_str) (imp
 
   | _ -> failwith "non method returned" (* cannot happen because we only requested methods *)
 
-         (* ES.throw 
+        (* ES.throw 
                       @@ Error.make fun_loc ~hint:(Some (None,"specify one with '::' annotation")) 
                       @@ Fmt.str "multiple definitions for function %s : \n\t%s" id 
                         (List.map (
