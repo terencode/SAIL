@@ -102,7 +102,7 @@ let check_call (name:string) (f : function_proto) (args: expression list) loc : 
     let nb_args = List.length args and nb_params = List.length f.args in
     ES.throw_if (Error.make loc (Printf.sprintf "unexpected number of arguments passed to %s : expected %i but got %i" name nb_params nb_args))
                 (nb_args <> nb_params)
-    >>= fun () -> 
+    >> fun () -> 
     ListM.iter2 
     (
       fun (ca:expression) ({ty=a;_}:param) ->

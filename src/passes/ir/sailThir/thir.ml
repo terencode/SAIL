@@ -154,7 +154,7 @@ struct
       let ty = CompoundType {origin= Some origin;decl_ty=Some (S ()); name; generic_instances=[]} in 
       (buildExp (loc,ty) (StructAlloc (origin,name, List.of_seq fields)))
 
-    | EnumAlloc _ -> ES.throw (Error.make loc "todo enum alloc ")
+    | EnumAlloc ((l,constructor),_args) -> ES.throw Error.(make l @@ Fmt.str "constructor '%s'" constructor)
   in aux e
 
 
