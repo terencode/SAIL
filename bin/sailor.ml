@@ -236,15 +236,17 @@ let sailor (files: string list) (intermediate:bool) (jit:bool) (noopt:bool) (dum
             let import = fun m -> {i with dir=Filename.(dirname m ^ dir_sep); proc_order=(List.length compiling)} in 
 
             match find_file_opt source ~paths:(Filename.current_dir_name::paths),find_file_opt mir_name with
-            | Some s,Some m when let mir = unmarshal_sm m in 
+            | Some s,Some m when List.length force_comp < 2  && let mir = unmarshal_sm m in 
                                     Digest.(equal mir.md.hash @@ file s) && 
-                                    List.length force_comp < 2 && 
                                     mir.md.version = Const.sailor_version -> (* mir up-to-date with source -> use mir *)
               return (treated,import m)
             | None, Some m -> (* mir but no source -> use mir *)
+              let* () = E.throw_if Logging.(make_msg dummy_pos 
+                @@ Printf.sprintf "module '%s' has no source but forceful rebuild requested, aborting..." source) (List.length force_comp = 2) 
+              in
               let mir = unmarshal_sm m in
               E.throw_if 
-              Logging.(make_msg dummy_pos @@ Printf.sprintf "module %s was compiled with sailor %s, current is %s" mir.md.name mir.md.version Const.sailor_version)
+              Logging.(make_msg dummy_pos @@ Printf.sprintf "module '%s' was compiled with sailor %s, current is %s" mir.md.name mir.md.version Const.sailor_version)
               (mir.md.version <> Const.sailor_version) 
               >>| fun () -> treated,import m
             | None,None -> (* nothing to work with *)
