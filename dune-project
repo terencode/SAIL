@@ -23,6 +23,6 @@
     (logs (>= 0.7))
     (mtime (>= 1.3.0))
     (ctypes-foreign (>= 0.18.0))
-    (llvm (= 15.0.7+nnp-2))
+    (llvm (= 16.0.6+nnp))
     zarith
     ))

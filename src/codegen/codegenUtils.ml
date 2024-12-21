@@ -1,10 +1,10 @@
-open Llvm
 open Common
+module L = Llvm
 open TypesCommon
 open CodegenEnv
 open Monad.UseMonad(Logging.Logger)
 
-type llvm_args = { c:llcontext; b:llbuilder;m:llmodule; layout : Llvm_target.DataLayout.t}
+type llvm_args = { c:L.llcontext; b:L.llbuilder;m:L.llmodule; layout : Llvm_target.DataLayout.t}
 let mangle_method_name (name:string) (mname:string) (args: sailtype list ) : string =
   let back = List.fold_left (fun s t -> s ^ string_of_sailtype (Some t) ^ "_"  ) "" args in
   let front = "_" ^ mname ^ "_" ^ name ^ "_" in
@@ -12,13 +12,14 @@ let mangle_method_name (name:string) (mname:string) (args: sailtype list ) : str
   (* Logs.debug (fun m -> m "renamed %s to %s" name res); *)
   res
 
-let getLLVMLiteral (l:literal) (llvm:llvm_args) : llvalue =
+let getLLVMLiteral (l:literal) (llvm:llvm_args) : L.llvalue =
+  let open L in
   match l with
   | LBool b -> const_int (i1_type llvm.c) (Bool.to_int b)
   | LInt i -> const_int_of_string (integer_type llvm.c i.size) (Z.to_string i.l) 10
   | LFloat f -> const_float (double_type llvm.c) f
   | LChar c -> const_int (i8_type llvm.c) (Char.code c)
-  | LString s -> let s = build_global_stringptr  s ".str" llvm.b in build_pointercast s (pointer_type2 llvm.c) "" llvm.b
+  | LString s -> let s = build_global_stringptr  s ".str" llvm.b in build_pointercast s (pointer_type llvm.c) "" llvm.b
 
 let ty_of_alias(ty:sailtype) env : sailtype  =
   match ty.value with
@@ -31,7 +32,8 @@ let ty_of_alias(ty:sailtype) env : sailtype  =
     end
   | _ ->  ty
 
-let unary (op:unOp) (t,v) : llbuilder -> llvalue = 
+let unary (op:unOp) (t,v) : L.llbuilder -> L.llvalue = 
+  let open L in
   let f = 
     match snd t,op with
     | Float,Neg -> build_fneg
@@ -41,7 +43,8 @@ let unary (op:unOp) (t,v) : llbuilder -> llvalue =
   in f v ""
   
   
-let binary (op:binOp) (t:sailtype) (l1:llvalue) (l2:llvalue) : llbuilder -> llvalue = 
+let binary (op:binOp) (t:sailtype) (l1:L.llvalue) (l2:L.llvalue) : L.llbuilder -> L.llvalue = 
+  let open L in
   let operators = function
     | Int _ -> 
       Some [
@@ -84,16 +87,16 @@ let binary (op:binOp) (t:sailtype) (l1:llvalue) (l2:llvalue) : llbuilder -> llva
   | None -> Printf.sprintf "codegen: bad usage of binop '%s' with type %s" (string_of_binop op) (string_of_sailtype @@ Some t) |> failwith
 
 
-let toLLVMArgs (args: param list ) (env:DeclEnv.t) (llvm:llvm_args) : (bool * sailtype * llvalue) array E.t = 
+let toLLVMArgs (args: param list ) (env:DeclEnv.t) (llvm:llvm_args) : (bool * sailtype * L.llvalue) array E.t = 
   ListM.map (
     fun {id;mut;ty=t;_} -> 
       let+ ty = getLLVMType env t llvm.c llvm.m in 
-      mut,t,build_alloca ty id llvm.b
+      mut,t,L.build_alloca ty id llvm.b
   ) args <&> Array.of_list 
 
 
 let get_memcpy_intrinsic llvm = 
-  let args_type = [|pointer_type2 llvm.c;  pointer_type2 llvm.c; i64_type llvm.c; i1_type llvm.c|] in
-
+  let open L in
+  let args_type = [|pointer_type llvm.c;  pointer_type llvm.c; i64_type llvm.c; i1_type llvm.c|] in
   let f = declare_function "llvm.memcpy.p0i8.p0i8.i64" (function_type (void_type llvm.c) args_type ) llvm.m in
   f

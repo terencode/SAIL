@@ -41,9 +41,9 @@ let getLLVMBasicType f ty llc llm  : L.lltype E.t =
     | Int n -> L.integer_type llc n |> return
     | Float -> L.double_type llc |> return
     | Char -> L.i8_type llc |> return
-    | String -> L.pointer_type2 llc |> return
+    | String -> L.pointer_type llc |> return
     | ArrayType (t,s) -> let+ t = aux t in L.array_type t s
-    | Box _ | RefType _ -> L.pointer_type2 llc |> return
+    | Box _ | RefType _ -> L.pointer_type llc |> return
     | GenericType _ -> E.throw Logging.(make_msg ty.loc "no generic type in codegen")
     | CompoundType {name; _} when name.value = "_value" -> L.i64_type llc |> return (* for extern functions *)
     | CompoundType {origin=None;_} 
