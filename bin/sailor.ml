@@ -226,9 +226,8 @@ let sailor (files: string list) (intermediate:bool) (jit:bool) (noopt:bool) (dum
             let import = fun m -> {i with dir=Filename.(dirname m ^ dir_sep); proc_order=(List.length compiling)} in 
 
             match find_file_opt source ~paths:(Filename.current_dir_name::paths),find_file_opt mir_name with
-            | Some s,Some m when let mir = unmarshal_sm m in 
+            | Some s,Some m when List.length force_comp < 2 && let mir = unmarshal_sm m in 
                                     Digest.(equal mir.md.hash @@ file s) && 
-                                    List.length force_comp < 2 && 
                                     mir.md.version = Const.sailor_version -> (* mir up-to-date with source -> use mir *)
               return (treated,import m)
             | None, Some m -> (* mir but no source -> use mir *)
