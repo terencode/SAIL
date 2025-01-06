@@ -37,6 +37,7 @@
 %token <char> CHAR
 
 %token LPAREN "(" RPAREN ")" LBRACE "{" RBRACE "}" LSQBRACE "[" RSQBRACE "]" LANGLE "<" RANGLE ">" (* ARROW "->" *)
+%token LPARC RPARC LSEQC RSEQC 
 %token COMMA "," COLON ":" DCOLON "::" SEMICOLON ";" DOT "."
 %token ASSIGN "="
 %token IMPORT
@@ -50,7 +51,7 @@
 %token WRITES READS
 %token P_PROC_INIT
 // %token AWAIT EMIT WATCHING WHEN PAR "||"
-%token PAR SEQ
+// %token PAR SEQ
 %token P_INIT P_LOOP
 // %token P_LPAREN "((" P_RPAREN "))"
 %token WITH
@@ -152,8 +153,8 @@ let loop :=
     located(
         | ~ = statement ; ~ = pwhen ; <Statement>
         | ~ = located(UID) ; ~ = pwhen; <Run>
-        | PAR  ; cond = pwhen ; "{" ;  children = separated_list(WITH,loop) ; "}" ; { PGroup {p_ty=Parallel; cond ; children} }
-        | SEQ  ; cond = pwhen ; "{" ;  children = separated_list(WITH,loop) ; "}" ; { PGroup {p_ty=Sequence; cond ; children} }
+        | LPARC ;  children = separated_list(WITH,loop) ; RPARC ; cond = pwhen ; { PGroup {p_ty=Parallel; cond ; children} }
+        | LSEQC ;  children = separated_list(WITH,loop) ; RSEQC ; cond = pwhen ; { PGroup {p_ty=Sequence; cond ; children} }
     )
 
 let pwhen == midrule(WHEN ; LPAREN ; ~= expression ; RPAREN; <>)?
