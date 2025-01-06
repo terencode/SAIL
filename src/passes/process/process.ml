@@ -19,8 +19,8 @@ module Pass = Pass.Make(struct
       let rec compute_tree closed (l,pi:loc * _ proc_init)  : H.statement M.t = 
         let closed = FieldSet.add pi.proc closed in (* no cycle *)
 
-        let* p = find_process_source (l,pi.proc) pi.mloc procs (*fixme : grammar to allow :: syntax *) in
-        let* p = M.throw_if_none Error.(make l @@ Fmt.str "process '%s' is unknown" pi.proc) p in
+        let* p = find_process_source (l,pi.proc) pi.mloc procs (*fixme : grammar to allow :: syntax *)
+          >>= M.throw_if_none Error.(make l @@ Fmt.str "process '%s' is unknown" pi.proc) in
         let* tag = M.fresh_prefix p.p_name in
         let prefix = (Fmt.str "%s_%s_" tag) in
         let read_params,write_params = p.p_interface.p_shared_vars in 
@@ -32,8 +32,9 @@ module Pass = Pass.Make(struct
         let* () = param_arg_mismatch "write" write_params pi.write in
         let* () = param_arg_mismatch "init" p.p_interface.p_params pi.params in
 
-
+        (* correspondence between shared variables names (given, original) *)
         let rename_l = List.map2 (fun (_,subx) (_,(x,_)) -> (x,subx) ) (pi.read @ pi.write) (fst p.p_interface.p_shared_vars @ snd p.p_interface.p_shared_vars) in
+        (* if the id corresponds to a shared variable, replace it by the name of the provided variable *)
         let rename = fun id -> match List.assoc_opt id rename_l with Some v -> v | None -> id in 
         
         (* add process local (but persistant) vars *)
@@ -65,9 +66,8 @@ module Pass = Pass.Make(struct
             return (process_cond cond s)
           
           | Run ((l,id),cond) ->
-              M.throw_if Error.(make l "not allowed to call Main process explicitely") (id = Constants.main_process) >>= fun () ->
-              M.throw_if Error.(make l "not allowed to have recursive process") (FieldSet.mem id closed) >>= fun () ->
               let* l,pi = M.throw_if_none Error.(make l @@ Fmt.str "no proc init called '%s'" id) (List.find_opt (fun (_,p: loc * _ proc_init) -> p.id = id) p.p_body.proc_init) in
+              M.throw_if Error.(make l "not allowed to have recursive process") (FieldSet.mem pi.proc closed) >>= fun () ->
               let read = List.map (fun (l,id) -> l,prefix id) pi.read in 
               let write = List.map (fun (l,id) -> l,prefix id) pi.write in 
               let params = List.map (H.rename_var_exp prefix) pi.params in
