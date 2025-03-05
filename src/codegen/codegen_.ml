@@ -24,7 +24,7 @@ let rec eval_l (venv,tenv as env:SailEnv.t* Env.TypeEnv.t) (llvm:llvm_args) (exp
       Env.TypeEnv.get_from_id (mk_locatable a.array.tag.loc  a.array.tag.ty) tenv >>= fun t -> 
         getLLVMType (snd venv) t llvm.c llvm.m in 
     let+ index = eval_r env llvm a.idx in
-    let llvm_array = L.build_in_bounds_gep2 llty array_val [|L.(const_int (i64_type llvm.c) 0 ); index|] "" llvm.b in 
+    let llvm_array = L.build_in_bounds_gep llty array_val [|L.(const_int (i64_type llvm.c) 0 ); index|] "" llvm.b in 
     llvm_array
     
   | StructRead2 s -> 
@@ -42,7 +42,7 @@ let rec eval_l (venv,tenv as env:SailEnv.t* Env.TypeEnv.t) (llvm:llvm_args) (exp
 
     let fields = decl.defn.fields in
     let {value=_,idx;_} = List.assoc s.value.field.value fields in 
-    L.build_struct_gep2 llty st idx "" llvm.b
+    L.build_struct_gep llty st idx "" llvm.b
   
   | StructAlloc2 s -> 
     let _,fieldlist = s.value.fields |> List.split in
@@ -54,7 +54,7 @@ let rec eval_l (venv,tenv as env:SailEnv.t* Env.TypeEnv.t) (llvm:llvm_args) (exp
     let struct_v = L.build_alloca strct_ty "" llvm.b in 
     let+ () = ListM.iteri ( fun i f ->
       let+ v = eval_r env llvm f.value in
-      let v_f = L.build_struct_gep2 (L.pointer_type2 llvm.c) struct_v i "" llvm.b in
+      let v_f = L.build_struct_gep (L.pointer_type llvm.c) struct_v i "" llvm.b in
       L.build_store v v_f llvm.b |> ignore
       ) fieldlist in
     struct_v
@@ -67,7 +67,7 @@ and eval_r (venv,tenv as env:SailEnv.t* Env.TypeEnv.t) (llvm:llvm_args) (exp:Mir
   let* ty = Env.TypeEnv.get_from_id (mk_locatable exp.tag.loc exp.tag.ty) tenv in
   let* llty = getLLVMType (snd venv) ty llvm.c llvm.m in 
   match exp.node with
-  | Variable _ | StructRead2 _ | ArrayRead _ | StructAlloc2 _ ->  let+ v = eval_l env llvm exp in L.build_load2 llty v "" llvm.b
+  | Variable _ | StructRead2 _ | ArrayRead _ | StructAlloc2 _ ->  let+ v = eval_l env llvm exp in L.build_load llty v "" llvm.b
 
   | Literal l -> return @@ getLLVMLiteral l llvm
 
@@ -79,7 +79,7 @@ and eval_r (venv,tenv as env:SailEnv.t* Env.TypeEnv.t) (llvm:llvm_args) (exp:Mir
       in binary bop.op (ty_of_alias ty (snd venv)) l1 l2 llvm.b  
   | Ref (_,e) -> eval_l env llvm e
 
-  | Deref e -> let+ v = eval_l env llvm e in L.build_load2 llty v "" llvm.b
+  | Deref e -> let+ v = eval_l env llvm e in L.build_load llty v "" llvm.b
 
   | ArrayStatic elements -> 
     begin
@@ -92,7 +92,7 @@ and eval_r (venv,tenv as env:SailEnv.t* Env.TypeEnv.t) (llvm:llvm_args) (exp:Mir
     L.set_linkage L.Linkage.Private array;
     L.set_unnamed_addr true array;
     L.set_global_constant true array;
-    L.build_load2 llty array "" llvm.b
+    L.build_load llty array "" llvm.b
     end
 
   | EnumAlloc _ -> E.throw Logging.(make_msg exp.tag.loc "enum allocation unimplemented") 
@@ -131,7 +131,7 @@ and construct_call (name:string) (mname:l_str) (args:MirAst.expression list) (ve
     else 
       return llargs 
   in
-  L.build_call2 llty llval (Array.of_list args) "" llvm.b
+  L.build_call llty llval (Array.of_list args) "" llvm.b
   
 open MirAst
   

@@ -8,6 +8,7 @@ module C = Codegen
 (* llvm *)
 module L = Llvm
 module T = Llvm_target
+module P = Llvm_passbuilder
 
 
 (* passes *)
@@ -60,24 +61,6 @@ let set_target (llm : Llvm.llmodule) (triple:string) : Llvm_target.Target.t * Ll
   L.set_target_triple triple llm;  let machine = T.TargetMachine.create ~triple target ~reloc_mode:PIC in
   L.set_data_layout (T.TargetMachine.data_layout machine |> T.DataLayout.as_string) llm;
   (target,machine)
-
-
-let add_opt_passes (pm : [`Module] Llvm.PassManager.t) : unit  = 
-  (* seems to be deprecated
-    TargetMachine.add_analysis_passes pm machine; *)
-
-  (* base needed for other passes *)
-  Llvm_scalar_opts.add_memory_to_register_promotion pm;
-  (* eleminates redundant values and loads *)
-  Llvm_scalar_opts.add_gvn pm;
-  (* reassociate binary expressions *)
-  Llvm_scalar_opts.add_reassociation pm;
-  (* dead code elimination, basic block merging and more *)
-  Llvm_scalar_opts.add_cfg_simplification pm;
-  
-  Llvm_ipo.add_global_optimizer pm;
-  Llvm_ipo.add_constant_merge pm;
-  Llvm_ipo.add_function_inlining pm
 
 
 let link ?(is_lib = false) (llm:Llvm.llmodule) (module_name : string) (basepath:string) (imports: string list) (libs : string list) (target, machine) clang_args : int =
@@ -156,21 +139,23 @@ let sailor (files: string list) (intermediate:bool) (jit:bool) (noopt:bool) (dum
 
   let compile sail_module basepath (comp_mode : Cli.comp_mode) : unit E.t =
     let* m = apply_passes sail_module comp_mode dump_ir in    
-    let+ llm = C.Codegen_.moduleToIR m verify_ir in
+    let* llm = C.Codegen_.moduleToIR m verify_ir in
 
     (* only generate mir file if codegen succeeds *)
     marshal_sm Filename.(concat basepath m.md.name ^ Const.mir_file_ext) m;
 
     let tm = set_target llm target_triple in
 
-    if not noopt && comp_mode <> Library then 
-        L.PassManager.(
-          let pm = create () in add_opt_passes pm;
-          let res = run_module llm pm in
-          Logs.debug (fun m -> m "pass manager executed, module modified : %b" res);
-          dispose pm
+    let+ () = if not noopt && comp_mode <> Library then 
+        P.(
+          let options = create_passbuilder_options () in
+          Logs.debug (fun m -> m "LLVM: running passes");
+          let res = run_passes llm "default<O3>" (snd tm) options in
+          dispose_passbuilder_options options;
+          E.throw_if_result Logging.(fun m -> make_msg dummy_pos m) res
         )
-    ;
+      else E.pure ()
+    in
 
     if intermediate then L.print_module Filename.(concat basepath m.md.name ^ Const.llvm_ir_ext) llm;
 

@@ -181,6 +181,10 @@ end
     | Some r -> throw (f r)
     | None -> pure ()
 
+  let throw_if_result (f: 'b -> msg) (x: ('a,'b) Result.t) : 'a t = match x with
+  | Ok x -> pure x
+  | Error e -> throw (f e)
+
 
   let get_warnings  (f : msg list -> unit) (x : 'a t) : 'a t =
     let+ v,l = x in f l.warnings; (v,l) 
